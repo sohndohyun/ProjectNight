@@ -3,8 +3,6 @@
 
 #include "NightClient.h"
 
-using namespace std;
-
 // 서버에 연결하는 함수 (1회성이므로 동기 처리, error_code 사용)
 std::expected<tcp::socket, std::string> connect_to_server(
     boost::asio::io_context& io,

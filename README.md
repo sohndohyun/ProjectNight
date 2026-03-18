@@ -40,6 +40,18 @@ cd C:\Users\{사용자}\source\repos\vcpkg
 vcpkg install boost:x64-windows
 ```
 
+## 코드 컨벤션
+
+| 항목 | 규칙 |
+|------|------|
+| C++ 표준 | C++23 |
+| 네이밍 | 클래스 `PascalCase`, 함수/변수 `snake_case`, 멤버 변수 `snake_case_` (후행 밑줄) |
+| 포맷팅 | 4칸 스페이스, Allman 중괄호 |
+| 헤더 가드 | `#pragma once` |
+| 네임스페이스 | `using namespace std;` 금지, 항상 `std::` 명시 |
+| 에러 처리 | `try/catch` 금지, `std::expected` + `boost::system::error_code` 사용 |
+| 클래스 순서 | public -> protected -> private |
+
 ## 빌드 및 실행
 
 프로젝트 루트에 포함된 bat 파일로 빌드부터 실행까지 한 번에 처리할 수 있습니다.
