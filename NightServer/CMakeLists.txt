@@ -15,7 +15,14 @@ project ("NightServer")
 find_package(Boost REQUIRED CONFIG)
 
 # 이 프로젝트의 실행 파일에 소스를 추가합니다.
-add_executable (NightServer "NightServer.cpp" "NightServer.h")
+add_executable (NightServer
+  "NightServer.cpp"
+  "NightServer.h"
+  "NightNetwork/Session.h"
+  "NightNetwork/Session.cpp"
+  "NightNetwork/Server.h"
+  "NightNetwork/Server.cpp"
+)
 
 # Boost.Asio 링크
 target_link_libraries(NightServer PRIVATE Boost::headers)
