@@ -5,7 +5,7 @@
 
 using namespace std;
 
-// 서버에 연결하는 함수
+// 서버에 연결하는 함수 (1회성이므로 동기 처리, error_code 사용)
 std::expected<tcp::socket, std::string> connect_to_server(
     boost::asio::io_context& io,
     const std::string& host,
@@ -26,34 +26,76 @@ std::expected<tcp::socket, std::string> connect_to_server(
     return socket;
 }
 
-// 서버에 데이터를 보내는 함수
-std::expected<void, std::string> send_to(tcp::socket& socket, const std::string& data)
+// 서버와의 비동기 읽기/쓰기를 담당하는 세션
+// stdin은 별도 스레드에서 읽고, 네트워크 I/O는 io_context에서 비동기 처리
+class Session : public std::enable_shared_from_this<Session>
 {
-    boost::system::error_code ec;
-    boost::asio::write(socket, boost::asio::buffer(data), ec);
+public:
+    explicit Session(tcp::socket socket)
+        : socket_(std::move(socket))
+    {
+    }
 
-    if (ec)
-        return std::unexpected("[에러] 송신 실패: " + ec.message());
+    void start()
+    {
+        do_read();
 
-    return {};
-}
+        std::thread([self = shared_from_this()]()
+        {
+            std::string line;
+            while (std::getline(std::cin, line))
+            {
+                line += "\n";
+                auto data = std::make_shared<std::string>(std::move(line));
+                boost::asio::post(self->socket_.get_executor(),
+                    [self, data]() { self->do_write(data); });
+            }
+            boost::asio::post(self->socket_.get_executor(),
+                [self]() { self->socket_.close(); });
+        }).detach();
+    }
 
-// 서버로부터 데이터를 읽는 함수
-std::expected<std::string, std::string> read_from(tcp::socket& socket)
-{
-    char buf[1024];
-    boost::system::error_code ec;
+private:
+    void do_read()
+    {
+        auto self = shared_from_this();
+        socket_.async_read_some(
+            boost::asio::buffer(buf_),
+            [this, self](boost::system::error_code ec, std::size_t len)
+            {
+                if (ec)
+                {
+                    if (ec == boost::asio::error::eof)
+                        std::cout << "[종료] 서버 연결 종료" << std::endl;
+                    else if (ec != boost::asio::error::operation_aborted)
+                        std::cerr << "[에러] 수신 실패: " << ec.message() << std::endl;
+                    return;
+                }
 
-    std::size_t len = socket.read_some(boost::asio::buffer(buf), ec);
+                std::cout << "[에코] " << std::string(buf_, len);
+                do_read();
+            });
+    }
 
-    if (ec == boost::asio::error::eof)
-        return std::unexpected("[종료] 서버 연결 종료");
+    void do_write(std::shared_ptr<std::string> data)
+    {
+        auto self = shared_from_this();
+        boost::asio::async_write(
+            socket_,
+            boost::asio::buffer(*data),
+            [this, self, data](boost::system::error_code ec, std::size_t)
+            {
+                if (ec)
+                {
+                    std::cerr << "[에러] 송신 실패: " << ec.message() << std::endl;
+                    return;
+                }
+            });
+    }
 
-    if (ec)
-        return std::unexpected("[에러] 수신 실패: " + ec.message());
-
-    return std::string(buf, len);
-}
+    tcp::socket socket_;
+    char buf_[1024];
+};
 
 int main()
 {
@@ -72,27 +114,8 @@ int main()
     std::cout << "=== Echo Client 시작 (서버: " << host << ":" << port << ") ===" << std::endl;
     std::cout << "메시지를 입력하세요 (종료: Ctrl+Z):" << std::endl;
 
-    std::string line;
-    while (std::getline(std::cin, line))
-    {
-        line += "\n";
-
-        auto send_result = send_to(connection.value(), line);
-        if (!send_result)
-        {
-            std::cerr << send_result.error() << std::endl;
-            break;
-        }
-
-        auto recv_result = read_from(connection.value());
-        if (!recv_result)
-        {
-            std::cerr << recv_result.error() << std::endl;
-            break;
-        }
-
-        std::cout << "[에코] " << recv_result.value();
-    }
+    std::make_shared<Session>(std::move(connection.value()))->start();
+    io.run();
 
     std::cout << "=== Echo Client 종료 ===" << std::endl;
     return 0;
