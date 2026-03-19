@@ -15,7 +15,7 @@ project ("NightClient")
 find_package(Boost REQUIRED CONFIG)
 
 # 이 프로젝트의 실행 파일에 소스를 추가합니다.
-add_executable (NightClient "NightClient.cpp" "NightClient.h")
+add_executable (NightClient "NightClient.cpp")
 
 # Boost.Asio 링크
 target_link_libraries(NightClient PRIVATE Boost::headers)

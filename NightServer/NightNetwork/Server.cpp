@@ -1,6 +1,8 @@
 #include "Server.h"
 #include "Session.h"
 
+#include <iostream>
+
 namespace NightNetwork
 {
 

@@ -1,9 +1,13 @@
 #pragma once
 
-#include "../NightServer.h"
+#include <memory>
+#include <string>
+#include <boost/asio.hpp>
 
 namespace NightNetwork
 {
+
+using boost::asio::ip::tcp;
 
 class Session : public std::enable_shared_from_this<Session>
 {

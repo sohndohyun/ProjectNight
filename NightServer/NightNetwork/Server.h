@@ -1,9 +1,13 @@
 #pragma once
 
-#include "../NightServer.h"
+#include <expected>
+#include <string>
+#include <boost/asio.hpp>
 
 namespace NightNetwork
 {
+
+using boost::asio::ip::tcp;
 
 class Server
 {

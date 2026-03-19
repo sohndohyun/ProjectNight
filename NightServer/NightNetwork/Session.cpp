@@ -1,5 +1,7 @@
 #include "Session.h"
 
+#include <iostream>
+
 namespace NightNetwork
 {
 

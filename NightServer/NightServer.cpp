@@ -3,6 +3,8 @@
 
 #include "NightNetwork/Server.h"
 
+#include <iostream>
+
 int main()
 {
     const unsigned short port = 12345;

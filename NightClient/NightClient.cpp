@@ -1,7 +1,14 @@
 // NightClient.cpp : 애플리케이션의 진입점을 정의합니다.
 //
 
-#include "NightClient.h"
+#include <expected>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <thread>
+#include <boost/asio.hpp>
+
+using boost::asio::ip::tcp;
 
 // 서버에 연결하는 함수 (1회성이므로 동기 처리, error_code 사용)
 std::expected<tcp::socket, std::string> connect_to_server(
