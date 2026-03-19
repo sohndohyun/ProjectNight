@@ -12,7 +12,7 @@ int main()
     auto server = NightNetwork::Server::create(port);
     if (!server)
     {
-        std::cerr << server.error() << std::endl;
+        std::println(stderr, "{}", server.error());
         return 1;
     }
 

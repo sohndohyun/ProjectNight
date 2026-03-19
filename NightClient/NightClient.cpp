@@ -14,7 +14,7 @@ int main()
     auto client = NightNetwork::Client::create(host, port);
     if (!client)
     {
-        std::cerr << client.error() << std::endl;
+        std::println(stderr, "{}", client.error());
         return 1;
     }
 
