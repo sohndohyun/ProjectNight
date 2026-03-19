@@ -4,9 +4,9 @@
 
 #include <expected>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
-#include <vector>
 
 namespace NightNetwork
 {
@@ -24,7 +24,7 @@ public:
     Server& operator=(const Server&) = delete;
 
     void update();
-    std::vector<Packet> poll_packets(std::size_t max_count = 0);
+    std::optional<Packet> poll_packet();
     void send(uint32_t session_id, std::span<const uint8_t> data);
     void broadcast(std::span<const uint8_t> data);
 

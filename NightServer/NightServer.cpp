@@ -25,22 +25,22 @@ int main()
     {
         server->update();
 
-        for (auto& pkt : server->poll_packets())
+        while (auto pkt = server->poll_packet())
         {
-            switch (pkt.type)
+            switch (pkt->type)
             {
             case NightNetwork::PacketType::Connect:
-                std::println("[접속] 클라이언트 #{}", pkt.session_id);
+                std::println("[접속] 클라이언트 #{}", pkt->session_id);
                 break;
 
             case NightNetwork::PacketType::Disconnect:
-                std::println("[종료] 클라이언트 #{}", pkt.session_id);
+                std::println("[종료] 클라이언트 #{}", pkt->session_id);
                 break;
 
             case NightNetwork::PacketType::Data:
                 std::println("[수신] 클라이언트 #{}: {}바이트",
-                             pkt.session_id, pkt.data.size());
-                server->send(pkt.session_id, pkt.data);
+                             pkt->session_id, pkt->data.size());
+                server->send(pkt->session_id, pkt->data);
                 break;
             }
         }

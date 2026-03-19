@@ -136,8 +136,11 @@ Server::Server(std::unique_ptr<Impl> impl)
 
 Server::~Server()
 {
-    impl_->work_guard.reset();
-    impl_->io.stop();
+    if (impl_)
+    {
+        impl_->work_guard.reset();
+        impl_->io.stop();
+    }
 }
 
 Server::Server(Server&&) noexcept = default;
@@ -147,23 +150,15 @@ void Server::update()
 {
 }
 
-std::vector<Packet> Server::poll_packets(std::size_t max_count)
+std::optional<Packet> Server::poll_packet()
 {
-    std::vector<Packet> result;
     std::lock_guard lock(impl_->packet_mutex);
-    auto& q = impl_->packet_queue;
+    if (impl_->packet_queue.empty())
+        return std::nullopt;
 
-    std::size_t count = q.size();
-    if (max_count > 0 && count > max_count)
-        count = max_count;
-
-    result.reserve(count);
-    for (std::size_t i = 0; i < count; ++i)
-    {
-        result.push_back(std::move(q.front()));
-        q.pop();
-    }
-    return result;
+    auto pkt = std::move(impl_->packet_queue.front());
+    impl_->packet_queue.pop();
+    return pkt;
 }
 
 void Server::send(uint32_t session_id, std::span<const uint8_t> data)

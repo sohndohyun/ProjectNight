@@ -40,10 +40,10 @@ int main()
     {
         client->update();
 
-        for (auto& data : client->poll_packets())
+        while (auto data = client->poll_packet())
         {
             std::print("[에코] {}",
-                       std::string(data.begin(), data.end()));
+                       std::string(data->begin(), data->end()));
         }
 
         next_tick += tick_rate;

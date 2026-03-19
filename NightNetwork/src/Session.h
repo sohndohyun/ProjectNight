@@ -6,6 +6,7 @@
 #include <functional>
 #include <memory>
 #include <queue>
+#include <span>
 #include <vector>
 #include <boost/asio.hpp>
 
@@ -24,7 +25,7 @@ public:
             ReceiveCallback on_receive, CloseCallback on_close);
 
     void start();
-    void send(std::vector<uint8_t> payload);
+    void send(std::span<const uint8_t> payload);
     void close();
 
     uint32_t id() const { return id_; }

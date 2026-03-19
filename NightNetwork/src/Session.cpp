@@ -20,7 +20,7 @@ void Session::start()
     do_read_header();
 }
 
-void Session::send(std::vector<uint8_t> payload)
+void Session::send(std::span<const uint8_t> payload)
 {
     if (payload.size() > Protocol::MAX_PAYLOAD_SIZE)
         return;

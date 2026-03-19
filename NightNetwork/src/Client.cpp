@@ -175,8 +175,11 @@ Client::Client(std::unique_ptr<Impl> impl)
 
 Client::~Client()
 {
-    impl_->work_guard.reset();
-    impl_->io.stop();
+    if (impl_)
+    {
+        impl_->work_guard.reset();
+        impl_->io.stop();
+    }
 }
 
 Client::Client(Client&&) noexcept = default;
@@ -186,32 +189,33 @@ void Client::update()
 {
 }
 
-std::vector<std::vector<uint8_t>> Client::poll_packets(std::size_t max_count)
+std::optional<std::vector<uint8_t>> Client::poll_packet()
 {
-    std::vector<std::vector<uint8_t>> result;
     std::lock_guard lock(impl_->receive_mutex);
-    auto& q = impl_->receive_queue;
+    if (impl_->receive_queue.empty())
+        return std::nullopt;
 
-    std::size_t count = q.size();
-    if (max_count > 0 && count > max_count)
-        count = max_count;
-
-    result.reserve(count);
-    for (std::size_t i = 0; i < count; ++i)
-    {
-        result.push_back(std::move(q.front()));
-        q.pop();
-    }
-    return result;
+    auto data = std::move(impl_->receive_queue.front());
+    impl_->receive_queue.pop();
+    return data;
 }
 
 void Client::send(std::span<const uint8_t> data)
 {
-    auto payload = std::vector<uint8_t>(data.begin(), data.end());
+    if (data.size() > Protocol::MAX_PAYLOAD_SIZE)
+        return;
+
+    uint32_t size = static_cast<uint32_t>(data.size());
+    auto frame = std::vector<uint8_t>(Protocol::HEADER_SIZE + size);
+    std::memcpy(frame.data(), &size, Protocol::HEADER_SIZE);
+    std::memcpy(frame.data() + Protocol::HEADER_SIZE, data.data(), size);
+
     boost::asio::post(impl_->io,
-        [this, payload = std::move(payload)]()
+        [this, frame = std::move(frame)]() mutable
         {
-            impl_->enqueue_send(payload);
+            impl_->write_queue.push(std::move(frame));
+            if (!impl_->writing)
+                impl_->do_write();
         });
 }
 

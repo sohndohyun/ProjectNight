@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <expected>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -24,7 +25,7 @@ public:
     Client& operator=(const Client&) = delete;
 
     void update();
-    std::vector<std::vector<uint8_t>> poll_packets(std::size_t max_count = 0);
+    std::optional<std::vector<uint8_t>> poll_packet();
     void send(std::span<const uint8_t> data);
     bool is_connected() const;
 
