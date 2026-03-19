@@ -7,38 +7,35 @@ Boost.Asio 기반 비동기 TCP Echo Server/Client 프로젝트.
 | 도구 | 비고 |
 |------|------|
 | **Visual Studio 2022** | MSVC 컴파일러(`cl.exe`), C++23 지원 필요 |
-| **CMake 3.8+** | Visual Studio 설치 시 함께 설치 가능 |
+| **CMake 3.25+** | Visual Studio 설치 시 함께 설치 가능 |
 | **Ninja** | Visual Studio 설치 시 함께 설치 가능 |
-| **vcpkg** | 아래 설치 방법 참고 |
+| **Git** | 서브모듈 clone에 필요 |
 
-## vcpkg 설치
+## 프로젝트 받기
 
-CMakePresets.json이 vcpkg를 **프로젝트 상위 디렉터리**에서 참조하므로, 반드시 아래 경로에 클론해야 합니다.
-
-```
-repos/
-├── vcpkg/            ← 여기에 클론
-└── ProjectNight/     ← 이 프로젝트
-```
+vcpkg가 Git 서브모듈로 포함되어 있으므로, `--recursive` 옵션으로 clone합니다.
 
 ```bat
-cd C:\Users\{사용자}\source\repos
-git clone https://github.com/microsoft/vcpkg.git
-cd vcpkg
-bootstrap-vcpkg.bat
+git clone --recursive <repo-url>
+cd ProjectNight
 ```
 
-> 경로가 다를 경우 `NightServer/CMakePresets.json`과 `NightClient/CMakePresets.json`의
-> `CMAKE_TOOLCHAIN_FILE` 값을 수정하세요.
-
-## 라이브러리 설치
-
-vcpkg로 **Boost**를 설치합니다. (Boost.Asio, Boost.Lockfree 등은 Boost에 포함되어 있습니다)
+이미 clone한 경우 서브모듈만 따로 받을 수 있습니다.
 
 ```bat
-cd C:\Users\{사용자}\source\repos\vcpkg
-vcpkg install boost:x64-windows
+git submodule update --init --recursive
 ```
+
+## vcpkg 부트스트랩
+
+처음 한 번만 실행하면 됩니다.
+
+```bat
+vcpkg\bootstrap-vcpkg.bat
+```
+
+> 라이브러리는 별도로 설치할 필요 없습니다.
+> CMake configure 시 `vcpkg.json` 매니페스트를 기반으로 자동 설치됩니다.
 
 ## 코드 컨벤션
 
@@ -84,13 +81,29 @@ run_client.bat 3
 3. 클라이언트 창에서 텍스트를 입력하면, 서버가 그대로 에코하여 돌려보냅니다.
 4. 여러 클라이언트를 동시에 테스트하려면 `run_client.bat 3`처럼 숫자를 지정합니다.
 
+## 수동 빌드
+
+bat 파일 없이 직접 빌드할 수도 있습니다.
+
+```bat
+cmake --preset x64-debug
+cmake --build out/build/x64-debug
+```
+
+특정 타겟만 빌드하려면:
+
+```bat
+cmake --build out/build/x64-debug --target NightServer
+cmake --build out/build/x64-debug --target NightClient
+```
+
 ## 빌드 산출물 경로
 
-빌드 결과물은 각 프로젝트의 `out/build/x64-debug/` 디렉터리에 생성됩니다.
+빌드 결과물은 루트의 `out/build/x64-debug/` 하위에 생성됩니다.
 
 ```
-NightServer/out/build/x64-debug/NightServer.exe
-NightClient/out/build/x64-debug/NightClient.exe
+out/build/x64-debug/NightServer/NightServer.exe
+out/build/x64-debug/NightClient/NightClient.exe
 ```
 
 ## 트러블슈팅
@@ -98,6 +111,6 @@ NightClient/out/build/x64-debug/NightClient.exe
 | 증상 | 해결 |
 |------|------|
 | `Visual Studio를 찾을 수 없습니다` | Visual Studio 2022가 설치되어 있는지 확인 |
-| `Configure 실패` | vcpkg 경로가 올바른지, `vcpkg install boost:x64-windows`를 실행했는지 확인 |
+| `Configure 실패` | `vcpkg\bootstrap-vcpkg.bat`을 실행했는지 확인, 서브모듈이 제대로 받아졌는지 `git submodule status`로 확인 |
 | `Build 실패` | C++23을 지원하는 MSVC 버전인지 확인 (VS 2022 17.x 권장) |
 | 클라이언트 접속 불가 | 서버가 먼저 실행 중인지 확인, 방화벽에서 포트 12345 허용 여부 확인 |

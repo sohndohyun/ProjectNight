@@ -1,0 +1,8 @@
+{
+    "name": "projectnight",
+    "version-string": "0.1.0",
+    "dependencies": [
+        "boost-asio",
+        "boost-lockfree"
+    ]
+}

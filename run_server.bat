@@ -21,7 +21,7 @@ if not defined VS_PATH (
 call "%VS_PATH%\VC\Auxiliary\Build\vcvarsall.bat" x64 >nul 2>&1
 
 :build
-pushd "%~dp0NightServer"
+pushd "%~dp0"
 
 if not exist "out\build\x64-debug\build.ninja" (
     echo [빌드] CMake Configure...
@@ -31,13 +31,13 @@ if not exist "out\build\x64-debug\build.ninja" (
     echo [빌드] Configure 스킵 (이미 구성됨)
 )
 
-echo [빌드] CMake Build...
-cmake --build out/build/x64-debug
+echo [빌드] CMake Build (NightServer)...
+cmake --build out/build/x64-debug --target NightServer
 if %errorlevel% neq 0 ( echo [에러] Build 실패 & popd & pause & exit /b 1 )
 popd
 
 :: 실행
 echo.
 echo ========================================
-"%~dp0NightServer\out\build\x64-debug\NightServer.exe"
+"%~dp0out\build\x64-debug\NightServer\NightServer.exe"
 pause
