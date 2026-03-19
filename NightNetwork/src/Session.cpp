@@ -9,6 +9,7 @@ Session::Session(uint32_t id, tcp::socket socket,
                  ReceiveCallback on_receive, CloseCallback on_close)
     : id_(id)
     , socket_(std::move(socket))
+    , strand_(boost::asio::make_strand(socket_.get_executor()))
     , on_receive_(std::move(on_receive))
     , on_close_(std::move(on_close))
 {
@@ -29,16 +30,29 @@ void Session::send(std::vector<uint8_t> payload)
     std::memcpy(frame.data(), &size, Protocol::HEADER_SIZE);
     std::memcpy(frame.data() + Protocol::HEADER_SIZE, payload.data(), size);
 
-    write_queue_.push(std::move(frame));
-    if (!writing_)
-        do_write();
+    boost::asio::post(strand_,
+        [self = shared_from_this(), frame = std::move(frame)]() mutable
+        {
+            self->enqueue_write(std::move(frame));
+        });
 }
 
 void Session::close()
 {
-    boost::system::error_code ec;
-    socket_.shutdown(tcp::socket::shutdown_both, ec);
-    socket_.close(ec);
+    boost::asio::post(strand_,
+        [self = shared_from_this()]()
+        {
+            boost::system::error_code ec;
+            self->socket_.shutdown(tcp::socket::shutdown_both, ec);
+            self->socket_.close(ec);
+        });
+}
+
+void Session::enqueue_write(std::vector<uint8_t> frame)
+{
+    write_queue_.push(std::move(frame));
+    if (!writing_)
+        do_write();
 }
 
 void Session::do_read_header()
@@ -47,26 +61,27 @@ void Session::do_read_header()
     boost::asio::async_read(
         socket_,
         boost::asio::buffer(header_buf_, Protocol::HEADER_SIZE),
-        [this, self](boost::system::error_code ec, std::size_t)
-        {
-            if (ec)
+        boost::asio::bind_executor(strand_,
+            [this, self](boost::system::error_code ec, std::size_t)
             {
-                on_close_(id_);
-                return;
-            }
+                if (ec)
+                {
+                    on_close_(id_);
+                    return;
+                }
 
-            uint32_t body_size = 0;
-            std::memcpy(&body_size, header_buf_, Protocol::HEADER_SIZE);
+                uint32_t body_size = 0;
+                std::memcpy(&body_size, header_buf_, Protocol::HEADER_SIZE);
 
-            if (body_size == 0 || body_size > Protocol::MAX_PAYLOAD_SIZE)
-            {
-                on_close_(id_);
-                return;
-            }
+                if (body_size == 0 || body_size > Protocol::MAX_PAYLOAD_SIZE)
+                {
+                    on_close_(id_);
+                    return;
+                }
 
-            body_buf_.resize(body_size);
-            do_read_body();
-        });
+                body_buf_.resize(body_size);
+                do_read_body();
+            }));
 }
 
 void Session::do_read_body()
@@ -75,17 +90,18 @@ void Session::do_read_body()
     boost::asio::async_read(
         socket_,
         boost::asio::buffer(body_buf_),
-        [this, self](boost::system::error_code ec, std::size_t)
-        {
-            if (ec)
+        boost::asio::bind_executor(strand_,
+            [this, self](boost::system::error_code ec, std::size_t)
             {
-                on_close_(id_);
-                return;
-            }
+                if (ec)
+                {
+                    on_close_(id_);
+                    return;
+                }
 
-            on_receive_(id_, std::move(body_buf_));
-            do_read_header();
-        });
+                on_receive_(id_, std::move(body_buf_));
+                do_read_header();
+            }));
 }
 
 void Session::do_write()
@@ -102,16 +118,17 @@ void Session::do_write()
     boost::asio::async_write(
         socket_,
         boost::asio::buffer(front),
-        [this, self](boost::system::error_code ec, std::size_t)
-        {
-            write_queue_.pop();
-            if (ec)
+        boost::asio::bind_executor(strand_,
+            [this, self](boost::system::error_code ec, std::size_t)
             {
-                on_close_(id_);
-                return;
-            }
-            do_write();
-        });
+                write_queue_.pop();
+                if (ec)
+                {
+                    on_close_(id_);
+                    return;
+                }
+                do_write();
+            }));
 }
 
 } // namespace NightNetwork

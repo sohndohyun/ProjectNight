@@ -30,12 +30,14 @@ public:
     uint32_t id() const { return id_; }
 
 private:
+    void enqueue_write(std::vector<uint8_t> frame);
     void do_read_header();
     void do_read_body();
     void do_write();
 
     uint32_t id_;
     tcp::socket socket_;
+    boost::asio::strand<boost::asio::any_io_executor> strand_;
     ReceiveCallback on_receive_;
     CloseCallback on_close_;
 

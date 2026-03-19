@@ -2,8 +2,11 @@
 
 #include "Protocol.h"
 
+#include <atomic>
 #include <cstring>
+#include <mutex>
 #include <queue>
+#include <thread>
 #include <boost/asio.hpp>
 
 namespace NightNetwork
@@ -14,18 +17,25 @@ using boost::asio::ip::tcp;
 struct Client::Impl
 {
     boost::asio::io_context io;
+    boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard;
     tcp::socket socket;
-    bool connected = false;
 
+    std::atomic<bool> connected = false;
+
+    std::mutex receive_mutex;
     std::queue<std::vector<uint8_t>> receive_queue;
+
     std::queue<std::vector<uint8_t>> write_queue;
     bool writing = false;
 
     uint8_t header_buf[Protocol::HEADER_SIZE];
     std::vector<uint8_t> body_buf;
 
+    std::jthread io_thread;
+
     Impl()
-        : socket(io)
+        : work_guard(boost::asio::make_work_guard(io))
+        , socket(io)
     {
     }
 
@@ -43,13 +53,17 @@ struct Client::Impl
         if (ec)
             return std::unexpected("[에러] 서버 연결 실패: " + ec.message());
 
-        connected = true;
+        connected.store(true, std::memory_order_relaxed);
         return {};
     }
 
-    void start_read()
+    void start_io()
     {
         do_read_header();
+        io_thread = std::jthread([this]()
+        {
+            io.run();
+        });
     }
 
     void do_read_header()
@@ -61,7 +75,7 @@ struct Client::Impl
             {
                 if (ec)
                 {
-                    connected = false;
+                    connected.store(false, std::memory_order_relaxed);
                     return;
                 }
 
@@ -70,7 +84,7 @@ struct Client::Impl
 
                 if (body_size == 0 || body_size > Protocol::MAX_PAYLOAD_SIZE)
                 {
-                    connected = false;
+                    connected.store(false, std::memory_order_relaxed);
                     return;
                 }
 
@@ -88,11 +102,14 @@ struct Client::Impl
             {
                 if (ec)
                 {
-                    connected = false;
+                    connected.store(false, std::memory_order_relaxed);
                     return;
                 }
 
-                receive_queue.push(std::move(body_buf));
+                {
+                    std::lock_guard lock(receive_mutex);
+                    receive_queue.push(std::move(body_buf));
+                }
                 do_read_header();
             });
     }
@@ -130,7 +147,7 @@ struct Client::Impl
                 write_queue.pop();
                 if (ec)
                 {
-                    connected = false;
+                    connected.store(false, std::memory_order_relaxed);
                     return;
                 }
                 do_write();
@@ -153,22 +170,26 @@ std::expected<Client, std::string> Client::create(
 Client::Client(std::unique_ptr<Impl> impl)
     : impl_(std::move(impl))
 {
-    impl_->start_read();
+    impl_->start_io();
 }
 
-Client::~Client() = default;
+Client::~Client()
+{
+    impl_->work_guard.reset();
+    impl_->io.stop();
+}
+
 Client::Client(Client&&) noexcept = default;
 Client& Client::operator=(Client&&) noexcept = default;
 
 void Client::update()
 {
-    impl_->io.poll();
-    impl_->io.restart();
 }
 
 std::vector<std::vector<uint8_t>> Client::poll_packets(std::size_t max_count)
 {
     std::vector<std::vector<uint8_t>> result;
+    std::lock_guard lock(impl_->receive_mutex);
     auto& q = impl_->receive_queue;
 
     std::size_t count = q.size();
@@ -186,12 +207,17 @@ std::vector<std::vector<uint8_t>> Client::poll_packets(std::size_t max_count)
 
 void Client::send(std::span<const uint8_t> data)
 {
-    impl_->enqueue_send(data);
+    auto payload = std::vector<uint8_t>(data.begin(), data.end());
+    boost::asio::post(impl_->io,
+        [this, payload = std::move(payload)]()
+        {
+            impl_->enqueue_send(payload);
+        });
 }
 
 bool Client::is_connected() const
 {
-    return impl_->connected;
+    return impl_->connected.load(std::memory_order_relaxed);
 }
 
 } // namespace NightNetwork
