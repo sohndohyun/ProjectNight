@@ -5,12 +5,11 @@
 
 #include <algorithm>
 #include <cstring>
-#include <mutex>
-#include <queue>
 #include <thread>
 #include <unordered_map>
 #include <vector>
 #include <boost/asio.hpp>
+#include <boost/lockfree/queue.hpp>
 
 namespace NightNetwork
 {
@@ -29,8 +28,7 @@ struct Server::Impl
     uint32_t next_id = 1;
     std::unordered_map<uint32_t, std::shared_ptr<Session>> sessions;
 
-    std::mutex packet_mutex;
-    std::queue<Packet> packet_queue;
+    boost::lockfree::queue<Packet*, boost::lockfree::capacity<8192>> packet_queue;
 
     std::vector<std::jthread> io_threads;
 
@@ -39,6 +37,13 @@ struct Server::Impl
         , server_strand(boost::asio::make_strand(io))
         , acceptor(server_strand)
     {
+    }
+
+    ~Impl()
+    {
+        Packet* ptr = nullptr;
+        while (packet_queue.pop(ptr))
+            delete ptr;
     }
 
     std::expected<void, std::string> listen(unsigned short port)
@@ -66,8 +71,7 @@ struct Server::Impl
 
     void push_packet(Packet pkt)
     {
-        std::lock_guard lock(packet_mutex);
-        packet_queue.push(std::move(pkt));
+        packet_queue.push(new Packet(std::move(pkt)));
     }
 
     void start_threads()
@@ -156,12 +160,12 @@ void Server::update()
 
 std::optional<Packet> Server::poll_packet()
 {
-    std::lock_guard lock(impl_->packet_mutex);
-    if (impl_->packet_queue.empty())
+    Packet* ptr = nullptr;
+    if (!impl_->packet_queue.pop(ptr))
         return std::nullopt;
 
-    auto pkt = std::move(impl_->packet_queue.front());
-    impl_->packet_queue.pop();
+    auto pkt = std::move(*ptr);
+    delete ptr;
     return pkt;
 }
 

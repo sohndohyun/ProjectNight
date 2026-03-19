@@ -4,37 +4,33 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <mutex>
 #include <vector>
 
 namespace NightNetwork
 {
 
 /// <summary>
-/// Thread-safe LIFO 메모리 풀. 고정 capacity(BLOCK_SIZE) 버퍼를 재활용하여
+/// Thread-local LIFO 메모리 풀. 고정 capacity(BLOCK_SIZE) 버퍼를 재활용하여
 /// send/receive 경로에서의 반복적인 힙 할당을 줄인다.
 ///
-/// Server::Impl이 하나의 풀을 소유하고 모든 Session에 참조를 전달한다.
-/// Client::Impl은 자체 풀(기본 32개)을 소유한다.
+/// 각 스레드가 자체 풀을 소유하므로 동기화가 필요 없다.
+/// strand가 다른 스레드에서 실행되면 버퍼가 스레드 간 자연 이동한다.
 /// </summary>
 class BufferPool
 {
 public:
     using Buffer = std::vector<uint8_t>;
 
-    /// <summary>
-    /// 풀에서 관리하는 버퍼의 고정 capacity (헤더 + 최대 페이로드)
-    /// </summary>
     static constexpr std::size_t BLOCK_SIZE =
         Protocol::HEADER_SIZE + Protocol::MAX_PAYLOAD_SIZE;
 
-    explicit BufferPool(std::size_t max_size = 256)
-        : max_size_(max_size)
+    explicit BufferPool(std::size_t max_size_per_thread = 64)
+        : max_size_per_thread_(max_size_per_thread)
     {
     }
 
     /// <summary>
-    /// 풀에서 버퍼를 꺼내고 resize(size)하여 반환한다.
+    /// thread_local 풀에서 버퍼를 꺼내고 resize(size)하여 반환한다.
     /// 풀이 비었으면 reserve(BLOCK_SIZE)로 새로 생성한다.
     /// size > BLOCK_SIZE이면 빈 벡터를 반환한다(거부).
     /// </summary>
@@ -43,11 +39,11 @@ public:
         if (size > BLOCK_SIZE)
             return {};
 
-        std::lock_guard lock(mutex_);
-        if (!pool_.empty())
+        auto& pool = thread_local_pool();
+        if (!pool.empty())
         {
-            auto buf = std::move(pool_.back());
-            pool_.pop_back();
+            auto buf = std::move(pool.back());
+            pool.pop_back();
             buf.resize(size);
             return buf;
         }
@@ -59,26 +55,30 @@ public:
     }
 
     /// <summary>
-    /// capacity가 BLOCK_SIZE인 버퍼만 풀에 반환한다.
-    /// 풀이 max_size에 도달했으면 자연 해제(drop)된다.
+    /// capacity가 BLOCK_SIZE인 버퍼만 thread_local 풀에 반환한다.
+    /// 풀이 max_size_per_thread에 도달했으면 자연 해제(drop)된다.
     /// </summary>
     void release(Buffer buf)
     {
         if (buf.capacity() != BLOCK_SIZE)
             return;
 
-        std::lock_guard lock(mutex_);
-        if (pool_.size() < max_size_)
+        auto& pool = thread_local_pool();
+        if (pool.size() < max_size_per_thread_)
         {
             buf.clear();
-            pool_.push_back(std::move(buf));
+            pool.push_back(std::move(buf));
         }
     }
 
 private:
-    std::mutex mutex_;
-    std::vector<Buffer> pool_;
-    std::size_t max_size_;
+    std::size_t max_size_per_thread_;
+
+    static std::vector<Buffer>& thread_local_pool()
+    {
+        thread_local std::vector<Buffer> pool;
+        return pool;
+    }
 };
 
 } // namespace NightNetwork

@@ -6,10 +6,10 @@
 #include <atomic>
 #include <chrono>
 #include <cstring>
-#include <mutex>
 #include <queue>
 #include <thread>
 #include <boost/asio.hpp>
+#include <boost/lockfree/spsc_queue.hpp>
 
 namespace NightNetwork
 {
@@ -26,8 +26,8 @@ struct Client::Impl
 
     std::atomic<bool> connected = false;
 
-    std::mutex receive_mutex;
-    std::queue<std::vector<uint8_t>> receive_queue;
+    boost::lockfree::spsc_queue<std::vector<uint8_t>*,
+        boost::lockfree::capacity<4096>> receive_queue;
 
     std::queue<std::vector<uint8_t>> write_queue;
     bool writing = false;
@@ -47,6 +47,13 @@ struct Client::Impl
         , last_activity(std::chrono::steady_clock::now())
     {
         body_buf.reserve(Protocol::MAX_PAYLOAD_SIZE);
+    }
+
+    ~Impl()
+    {
+        std::vector<uint8_t>* ptr = nullptr;
+        while (receive_queue.pop(ptr))
+            delete ptr;
     }
 
     std::expected<void, std::string> connect(
@@ -134,8 +141,7 @@ struct Client::Impl
                 {
                     auto copy = pool.acquire(body_buf.size());
                     std::memcpy(copy.data(), body_buf.data(), body_buf.size());
-                    std::lock_guard lock(receive_mutex);
-                    receive_queue.push(std::move(copy));
+                    receive_queue.push(new std::vector<uint8_t>(std::move(copy)));
                 }
                 do_read_header();
             });
@@ -250,12 +256,12 @@ void Client::update()
 
 std::optional<std::vector<uint8_t>> Client::poll_packet()
 {
-    std::lock_guard lock(impl_->receive_mutex);
-    if (impl_->receive_queue.empty())
+    std::vector<uint8_t>* ptr = nullptr;
+    if (!impl_->receive_queue.pop(ptr))
         return std::nullopt;
 
-    auto data = std::move(impl_->receive_queue.front());
-    impl_->receive_queue.pop();
+    auto data = std::move(*ptr);
+    delete ptr;
     return data;
 }
 

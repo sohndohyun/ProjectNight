@@ -33,7 +33,7 @@ bootstrap-vcpkg.bat
 
 ## 라이브러리 설치
 
-vcpkg로 **Boost**를 설치합니다. (Boost.Asio는 header-only이므로 Boost 전체를 설치하면 됩니다)
+vcpkg로 **Boost**를 설치합니다. (Boost.Asio, Boost.Lockfree 등은 Boost에 포함되어 있습니다)
 
 ```bat
 cd C:\Users\{사용자}\source\repos\vcpkg
