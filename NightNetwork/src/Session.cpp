@@ -1,6 +1,6 @@
 #include "Session.h"
 
-#include <cstring>
+#include "TransportDetail.h"
 
 namespace NightNetwork
 {
@@ -30,10 +30,7 @@ void Session::send(std::span<const uint8_t> payload)
     if (payload.size() > Protocol::MAX_PAYLOAD_SIZE)
         return;
 
-    uint32_t size = static_cast<uint32_t>(payload.size());
-    auto frame = pool_.acquire(Protocol::HEADER_SIZE + size);
-    std::memcpy(frame.data(), &size, Protocol::HEADER_SIZE);
-    std::memcpy(frame.data() + Protocol::HEADER_SIZE, payload.data(), size);
+    auto frame = Detail::build_frame(pool_, payload);
 
     boost::asio::post(strand_,
         [self = shared_from_this(), frame = std::move(frame)]() mutable
@@ -56,18 +53,23 @@ void Session::close()
     boost::asio::post(strand_,
         [self = shared_from_this()]()
         {
-            self->heartbeat_timer_.cancel();
-            boost::system::error_code ec;
-            self->socket_.shutdown(tcp::socket::shutdown_both, ec);
-            self->socket_.close(ec);
+            self->handle_close();
         });
 }
 
 void Session::enqueue_write(std::vector<uint8_t> frame)
 {
-    write_queue_.push(std::move(frame));
-    if (!writing_)
-        do_write();
+    if (closed_)
+    {
+        pool_.release(std::move(frame));
+        return;
+    }
+
+    Detail::enqueue_frame(write_queue_, writing_, std::move(frame),
+        [this]()
+        {
+            do_write();
+        });
 }
 
 void Session::do_read_header()
@@ -87,8 +89,7 @@ void Session::do_read_header()
 
                 last_activity_ = std::chrono::steady_clock::now();
 
-                uint32_t body_size = 0;
-                std::memcpy(&body_size, header_buf_, Protocol::HEADER_SIZE);
+                uint32_t body_size = Detail::read_payload_size(header_buf_);
 
                 if (body_size == 0)
                 {
@@ -181,15 +182,19 @@ void Session::start_heartbeat()
 
 void Session::send_keepalive()
 {
-    uint32_t zero = 0;
-    std::vector<uint8_t> frame(Protocol::HEADER_SIZE);
-    std::memcpy(frame.data(), &zero, Protocol::HEADER_SIZE);
-    enqueue_write(std::move(frame));
+    enqueue_write(Detail::build_keepalive_frame(pool_));
 }
 
 void Session::handle_close()
 {
+    if (closed_)
+        return;
+
+    closed_ = true;
     heartbeat_timer_.cancel();
+    boost::system::error_code ec;
+    socket_.shutdown(tcp::socket::shutdown_both, ec);
+    socket_.close(ec);
     on_close_(id_);
 }
 

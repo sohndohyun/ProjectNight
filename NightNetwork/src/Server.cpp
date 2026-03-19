@@ -2,6 +2,7 @@
 
 #include "BufferPool.h"
 #include "Session.h"
+#include "TransportDetail.h"
 
 #include <algorithm>
 #include <cstring>
@@ -69,9 +70,14 @@ struct Server::Impl
         return {};
     }
 
-    void push_packet(Packet pkt)
+    bool push_packet(Packet pkt)
     {
-        packet_queue.push(new Packet(std::move(pkt)));
+        auto packet = new Packet(std::move(pkt));
+        if (packet_queue.push(packet))
+            return true;
+
+        delete packet;
+        return false;
     }
 
     void start_threads()
@@ -114,9 +120,11 @@ struct Server::Impl
                                     });
                             });
 
-                        sessions.emplace(id, session);
-                        push_packet(Packet{PacketType::Connect, id, {}});
-                        session->start();
+                        if (push_packet(Packet{PacketType::Connect, id, {}}))
+                        {
+                            sessions.emplace(id, session);
+                            session->start();
+                        }
                     }
 
                     do_accept();
@@ -174,10 +182,7 @@ void Server::send(uint32_t session_id, std::span<const uint8_t> data)
     if (data.size() > Protocol::MAX_PAYLOAD_SIZE)
         return;
 
-    uint32_t size = static_cast<uint32_t>(data.size());
-    auto frame = impl_->pool.acquire(Protocol::HEADER_SIZE + size);
-    std::memcpy(frame.data(), &size, Protocol::HEADER_SIZE);
-    std::memcpy(frame.data() + Protocol::HEADER_SIZE, data.data(), size);
+    auto frame = Detail::build_frame(impl_->pool, data);
 
     boost::asio::post(impl_->server_strand,
         [this, session_id, frame = std::move(frame)]() mutable
@@ -195,18 +200,14 @@ void Server::broadcast(std::span<const uint8_t> data)
     if (data.size() > Protocol::MAX_PAYLOAD_SIZE)
         return;
 
-    uint32_t size = static_cast<uint32_t>(data.size());
-    auto frame_template = impl_->pool.acquire(Protocol::HEADER_SIZE + size);
-    std::memcpy(frame_template.data(), &size, Protocol::HEADER_SIZE);
-    std::memcpy(frame_template.data() + Protocol::HEADER_SIZE, data.data(), size);
+    auto frame_template = Detail::build_frame(impl_->pool, data);
 
     boost::asio::post(impl_->server_strand,
         [this, frame_template = std::move(frame_template)]() mutable
         {
             for (auto& [id, session] : impl_->sessions)
             {
-                auto frame = impl_->pool.acquire(frame_template.size());
-                std::memcpy(frame.data(), frame_template.data(), frame_template.size());
+                auto frame = Detail::clone_frame(impl_->pool, frame_template);
                 session->enqueue_raw_frame(std::move(frame));
             }
             impl_->pool.release(std::move(frame_template));

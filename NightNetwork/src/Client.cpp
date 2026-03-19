@@ -2,6 +2,7 @@
 
 #include "BufferPool.h"
 #include "Protocol.h"
+#include "TransportDetail.h"
 
 #include <atomic>
 #include <chrono>
@@ -86,8 +87,13 @@ struct Client::Impl
 
     void handle_disconnect()
     {
+        if (!connected.exchange(false, std::memory_order_relaxed))
+            return;
+
         heartbeat_timer.cancel();
-        connected.store(false, std::memory_order_relaxed);
+        boost::system::error_code ec;
+        socket.shutdown(tcp::socket::shutdown_both, ec);
+        socket.close(ec);
     }
 
     void do_read_header()
@@ -105,8 +111,7 @@ struct Client::Impl
 
                 last_activity = std::chrono::steady_clock::now();
 
-                uint32_t body_size = 0;
-                std::memcpy(&body_size, header_buf, Protocol::HEADER_SIZE);
+                uint32_t body_size = Detail::read_payload_size(header_buf);
 
                 if (body_size == 0)
                 {
@@ -141,25 +146,27 @@ struct Client::Impl
                 {
                     auto copy = pool.acquire(body_buf.size());
                     std::memcpy(copy.data(), body_buf.data(), body_buf.size());
-                    receive_queue.push(new std::vector<uint8_t>(std::move(copy)));
+                    auto packet = new std::vector<uint8_t>(std::move(copy));
+                    if (!receive_queue.push(packet))
+                        delete packet;
                 }
                 do_read_header();
             });
     }
 
-    void enqueue_send(std::span<const uint8_t> data)
+    void enqueue_frame(std::vector<uint8_t> frame)
     {
-        if (data.size() > Protocol::MAX_PAYLOAD_SIZE)
+        if (!connected.load(std::memory_order_relaxed))
+        {
+            pool.release(std::move(frame));
             return;
+        }
 
-        uint32_t size = static_cast<uint32_t>(data.size());
-        auto frame = pool.acquire(Protocol::HEADER_SIZE + size);
-        std::memcpy(frame.data(), &size, Protocol::HEADER_SIZE);
-        std::memcpy(frame.data() + Protocol::HEADER_SIZE, data.data(), size);
-
-        write_queue.push(std::move(frame));
-        if (!writing)
-            do_write();
+        Detail::enqueue_frame(write_queue, writing, std::move(frame),
+            [this]()
+            {
+                do_write();
+            });
     }
 
     void do_write()
@@ -211,12 +218,7 @@ struct Client::Impl
 
     void send_keepalive()
     {
-        uint32_t zero = 0;
-        std::vector<uint8_t> frame(Protocol::HEADER_SIZE);
-        std::memcpy(frame.data(), &zero, Protocol::HEADER_SIZE);
-        write_queue.push(std::move(frame));
-        if (!writing)
-            do_write();
+        enqueue_frame(Detail::build_keepalive_frame(pool));
     }
 };
 
@@ -270,17 +272,15 @@ void Client::send(std::span<const uint8_t> data)
     if (data.size() > Protocol::MAX_PAYLOAD_SIZE)
         return;
 
-    uint32_t size = static_cast<uint32_t>(data.size());
-    auto frame = impl_->pool.acquire(Protocol::HEADER_SIZE + size);
-    std::memcpy(frame.data(), &size, Protocol::HEADER_SIZE);
-    std::memcpy(frame.data() + Protocol::HEADER_SIZE, data.data(), size);
+    if (!impl_->connected.load(std::memory_order_relaxed))
+        return;
+
+    auto frame = Detail::build_frame(impl_->pool, data);
 
     boost::asio::post(impl_->io,
         [this, frame = std::move(frame)]() mutable
         {
-            impl_->write_queue.push(std::move(frame));
-            if (!impl_->writing)
-                impl_->do_write();
+            impl_->enqueue_frame(std::move(frame));
         });
 }
 

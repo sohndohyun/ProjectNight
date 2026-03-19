@@ -77,6 +77,7 @@ private:
 
     std::queue<std::vector<uint8_t>> write_queue_;
     bool writing_ = false;
+    bool closed_ = false;
 
     boost::asio::steady_timer heartbeat_timer_;
     std::chrono::steady_clock::time_point last_activity_;
