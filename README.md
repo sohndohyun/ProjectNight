@@ -74,6 +74,17 @@ run_client.bat 3
 
 클라이언트 수를 인자로 넘기면 해당 수만큼 별도 창에서 동시에 실행됩니다.
 
+## 와이어 프로토콜
+
+- NightNetwork의 전송 헤더는 고정 8바이트이다.
+- 헤더 구조: `[magic(2)][version(1)][flags(1)][payload_length_be(4)]`
+- `payload_length_be`는 big-endian(network byte order)으로 직렬화된다.
+- 현재 `magic`은 `0x4E4E` (`'NN'`), `version`은 `1`이다.
+- `flags`의 bit 0은 keepalive(`FLAG_KEEPALIVE`)로 사용한다.
+- keepalive 프레임은 `flags = FLAG_KEEPALIVE`, `payload_length_be = 0` 이다.
+- 일반 데이터 프레임은 payload 길이 1~2048바이트만 허용한다.
+- 이전 4바이트 length-prefix 헤더와의 하위 호환은 지원하지 않으므로, 서버와 클라이언트는 같은 프로토콜 버전으로 빌드해야 한다.
+
 ## 테스트 방법
 
 1. `run_server.bat`를 실행하여 서버를 먼저 띄웁니다.

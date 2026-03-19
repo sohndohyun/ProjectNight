@@ -38,7 +38,7 @@ public:
     void start();
 
     /// <summary>
-    /// 페이로드를 length-prefix 프레임으로 감싸 strand에 post한다.
+    /// 페이로드를 내부 wire 헤더 프레임으로 감싸 strand에 post한다.
     /// MAX_PAYLOAD_SIZE 초과 시 무시된다.
     /// </summary>
     void send(std::span<const uint8_t> payload);

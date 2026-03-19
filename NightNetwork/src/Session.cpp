@@ -27,10 +27,12 @@ void Session::start()
 
 void Session::send(std::span<const uint8_t> payload)
 {
-    if (payload.size() > Protocol::MAX_PAYLOAD_SIZE)
+    if (payload.empty() || payload.size() > Protocol::MAX_PAYLOAD_SIZE)
         return;
 
-    auto frame = Detail::build_frame(pool_, payload);
+    auto frame = Detail::build_data_frame(pool_, payload);
+    if (frame.empty())
+        return;
 
     boost::asio::post(strand_,
         [self = shared_from_this(), frame = std::move(frame)]() mutable
@@ -87,23 +89,22 @@ void Session::do_read_header()
                     return;
                 }
 
-                last_activity_ = std::chrono::steady_clock::now();
-
-                uint32_t body_size = Detail::read_payload_size(header_buf_);
-
-                if (body_size == 0)
-                {
-                    do_read_header();
-                    return;
-                }
-
-                if (body_size > Protocol::MAX_PAYLOAD_SIZE)
+                auto header = Detail::decode_header(header_buf_);
+                if (!header)
                 {
                     handle_close();
                     return;
                 }
 
-                body_buf_.resize(body_size);
+                last_activity_ = std::chrono::steady_clock::now();
+
+                if (header->is_keepalive())
+                {
+                    do_read_header();
+                    return;
+                }
+
+                body_buf_.resize(header->payload_size);
                 do_read_body();
             }));
 }

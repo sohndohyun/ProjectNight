@@ -109,23 +109,22 @@ struct Client::Impl
                     return;
                 }
 
-                last_activity = std::chrono::steady_clock::now();
-
-                uint32_t body_size = Detail::read_payload_size(header_buf);
-
-                if (body_size == 0)
-                {
-                    do_read_header();
-                    return;
-                }
-
-                if (body_size > Protocol::MAX_PAYLOAD_SIZE)
+                auto header = Detail::decode_header(header_buf);
+                if (!header)
                 {
                     handle_disconnect();
                     return;
                 }
 
-                body_buf.resize(body_size);
+                last_activity = std::chrono::steady_clock::now();
+
+                if (header->is_keepalive())
+                {
+                    do_read_header();
+                    return;
+                }
+
+                body_buf.resize(header->payload_size);
                 do_read_body();
             });
     }
@@ -269,13 +268,15 @@ std::optional<std::vector<uint8_t>> Client::poll_packet()
 
 void Client::send(std::span<const uint8_t> data)
 {
-    if (data.size() > Protocol::MAX_PAYLOAD_SIZE)
+    if (data.empty() || data.size() > Protocol::MAX_PAYLOAD_SIZE)
         return;
 
     if (!impl_->connected.load(std::memory_order_relaxed))
         return;
 
-    auto frame = Detail::build_frame(impl_->pool, data);
+    auto frame = Detail::build_data_frame(impl_->pool, data);
+    if (frame.empty())
+        return;
 
     boost::asio::post(impl_->io,
         [this, frame = std::move(frame)]() mutable

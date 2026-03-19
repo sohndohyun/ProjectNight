@@ -41,7 +41,7 @@ public:
     void update();
 
     /// <summary>
-    /// 수신 큐에서 페이로드를 하나 꺼낸다 (length-prefix 헤더는 제거된 순수 데이터).
+    /// 수신 큐에서 페이로드를 하나 꺼낸다 (wire 헤더는 제거된 순수 데이터).
     /// 큐가 비었으면 nullopt을 반환한다. 루프에서 nullopt까지 반복 호출해야 한다.
     /// </summary>
     std::optional<std::vector<uint8_t>> poll_packet();

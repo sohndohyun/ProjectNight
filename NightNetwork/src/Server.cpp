@@ -5,7 +5,6 @@
 #include "TransportDetail.h"
 
 #include <algorithm>
-#include <cstring>
 #include <thread>
 #include <unordered_map>
 #include <vector>
@@ -179,10 +178,12 @@ std::optional<Packet> Server::poll_packet()
 
 void Server::send(uint32_t session_id, std::span<const uint8_t> data)
 {
-    if (data.size() > Protocol::MAX_PAYLOAD_SIZE)
+    if (data.empty() || data.size() > Protocol::MAX_PAYLOAD_SIZE)
         return;
 
-    auto frame = Detail::build_frame(impl_->pool, data);
+    auto frame = Detail::build_data_frame(impl_->pool, data);
+    if (frame.empty())
+        return;
 
     boost::asio::post(impl_->server_strand,
         [this, session_id, frame = std::move(frame)]() mutable
@@ -197,10 +198,12 @@ void Server::send(uint32_t session_id, std::span<const uint8_t> data)
 
 void Server::broadcast(std::span<const uint8_t> data)
 {
-    if (data.size() > Protocol::MAX_PAYLOAD_SIZE)
+    if (data.empty() || data.size() > Protocol::MAX_PAYLOAD_SIZE)
         return;
 
-    auto frame_template = Detail::build_frame(impl_->pool, data);
+    auto frame_template = Detail::build_data_frame(impl_->pool, data);
+    if (frame_template.empty())
+        return;
 
     boost::asio::post(impl_->server_strand,
         [this, frame_template = std::move(frame_template)]() mutable

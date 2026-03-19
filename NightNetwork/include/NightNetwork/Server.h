@@ -48,7 +48,7 @@ public:
     std::optional<Packet> poll_packet();
 
     /// <summary>
-    /// 특정 세션에 페이로드를 전송한다. 내부에서 length-prefix 프레임을 빌드한다.
+    /// 특정 세션에 페이로드를 전송한다. 내부 wire 헤더 프레임을 빌드한다.
     /// Protocol::MAX_PAYLOAD_SIZE(2048)를 초과하면 무시된다.
     /// 세션이 이미 종료된 경우에도 안전하다(조용히 버려진다).
     /// I/O 스레드로 post 되므로 게임 스레드에서 자유롭게 호출 가능하다.
