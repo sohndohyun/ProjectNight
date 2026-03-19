@@ -1,3 +1,3 @@
 add_executable(NightServer "NightServer.cpp")
 
-target_link_libraries(NightServer PRIVATE NightNetwork)
+target_link_libraries(NightServer PRIVATE NightNetwork NightCommon)

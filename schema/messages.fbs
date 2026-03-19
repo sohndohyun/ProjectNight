@@ -1,0 +1,31 @@
+namespace NightProtocol;
+
+table ChatMessage {
+    content: string;
+}
+
+struct Vec2 {
+    x: float;
+    y: float;
+}
+
+table MoveRequest {
+    position: Vec2;
+}
+
+table StateSync {
+    session_id: uint32;
+    position: Vec2;
+}
+
+union MessagePayload {
+    ChatMessage,
+    MoveRequest,
+    StateSync,
+}
+
+table Message {
+    payload: MessagePayload;
+}
+
+root_type Message;
