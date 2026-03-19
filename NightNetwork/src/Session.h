@@ -1,5 +1,6 @@
 #pragma once
 
+#include "BufferPool.h"
 #include "Protocol.h"
 
 #include <cstdint>
@@ -21,11 +22,12 @@ using CloseCallback = std::function<void(uint32_t)>;
 class Session : public std::enable_shared_from_this<Session>
 {
 public:
-    Session(uint32_t id, tcp::socket socket,
+    Session(uint32_t id, tcp::socket socket, BufferPool& pool,
             ReceiveCallback on_receive, CloseCallback on_close);
 
     void start();
     void send(std::span<const uint8_t> payload);
+    void enqueue_raw_frame(std::vector<uint8_t> frame);
     void close();
 
     uint32_t id() const { return id_; }
@@ -39,6 +41,7 @@ private:
     uint32_t id_;
     tcp::socket socket_;
     boost::asio::strand<boost::asio::any_io_executor> strand_;
+    BufferPool& pool_;
     ReceiveCallback on_receive_;
     CloseCallback on_close_;
 

@@ -5,14 +5,16 @@
 namespace NightNetwork
 {
 
-Session::Session(uint32_t id, tcp::socket socket,
+Session::Session(uint32_t id, tcp::socket socket, BufferPool& pool,
                  ReceiveCallback on_receive, CloseCallback on_close)
     : id_(id)
     , socket_(std::move(socket))
     , strand_(boost::asio::make_strand(socket_.get_executor()))
+    , pool_(pool)
     , on_receive_(std::move(on_receive))
     , on_close_(std::move(on_close))
 {
+    body_buf_.reserve(Protocol::MAX_PAYLOAD_SIZE);
 }
 
 void Session::start()
@@ -26,10 +28,19 @@ void Session::send(std::span<const uint8_t> payload)
         return;
 
     uint32_t size = static_cast<uint32_t>(payload.size());
-    std::vector<uint8_t> frame(Protocol::HEADER_SIZE + size);
+    auto frame = pool_.acquire(Protocol::HEADER_SIZE + size);
     std::memcpy(frame.data(), &size, Protocol::HEADER_SIZE);
     std::memcpy(frame.data() + Protocol::HEADER_SIZE, payload.data(), size);
 
+    boost::asio::post(strand_,
+        [self = shared_from_this(), frame = std::move(frame)]() mutable
+        {
+            self->enqueue_write(std::move(frame));
+        });
+}
+
+void Session::enqueue_raw_frame(std::vector<uint8_t> frame)
+{
     boost::asio::post(strand_,
         [self = shared_from_this(), frame = std::move(frame)]() mutable
         {
@@ -99,7 +110,9 @@ void Session::do_read_body()
                     return;
                 }
 
-                on_receive_(id_, std::move(body_buf_));
+                auto copy = pool_.acquire(body_buf_.size());
+                std::memcpy(copy.data(), body_buf_.data(), body_buf_.size());
+                on_receive_(id_, std::move(copy));
                 do_read_header();
             }));
 }
@@ -121,6 +134,7 @@ void Session::do_write()
         boost::asio::bind_executor(strand_,
             [this, self](boost::system::error_code ec, std::size_t)
             {
+                pool_.release(std::move(write_queue_.front()));
                 write_queue_.pop();
                 if (ec)
                 {

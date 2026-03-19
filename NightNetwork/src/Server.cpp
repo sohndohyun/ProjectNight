@@ -1,8 +1,10 @@
 #include <NightNetwork/Server.h>
 
+#include "BufferPool.h"
 #include "Session.h"
 
 #include <algorithm>
+#include <cstring>
 #include <mutex>
 #include <queue>
 #include <thread>
@@ -21,6 +23,8 @@ struct Server::Impl
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard;
     boost::asio::strand<boost::asio::io_context::executor_type> server_strand;
     tcp::acceptor acceptor;
+
+    BufferPool pool;
 
     uint32_t next_id = 1;
     std::unordered_map<uint32_t, std::shared_ptr<Session>> sessions;
@@ -89,7 +93,7 @@ struct Server::Impl
                     {
                         uint32_t id = next_id++;
                         auto session = std::make_shared<Session>(
-                            id, std::move(socket),
+                            id, std::move(socket), pool,
                             [this](uint32_t sid, std::vector<uint8_t> data)
                             {
                                 push_packet(Packet{
@@ -163,24 +167,45 @@ std::optional<Packet> Server::poll_packet()
 
 void Server::send(uint32_t session_id, std::span<const uint8_t> data)
 {
-    auto payload = std::vector<uint8_t>(data.begin(), data.end());
+    if (data.size() > Protocol::MAX_PAYLOAD_SIZE)
+        return;
+
+    uint32_t size = static_cast<uint32_t>(data.size());
+    auto frame = impl_->pool.acquire(Protocol::HEADER_SIZE + size);
+    std::memcpy(frame.data(), &size, Protocol::HEADER_SIZE);
+    std::memcpy(frame.data() + Protocol::HEADER_SIZE, data.data(), size);
+
     boost::asio::post(impl_->server_strand,
-        [this, session_id, payload = std::move(payload)]()
+        [this, session_id, frame = std::move(frame)]() mutable
         {
             auto it = impl_->sessions.find(session_id);
             if (it != impl_->sessions.end())
-                it->second->send(payload);
+                it->second->enqueue_raw_frame(std::move(frame));
+            else
+                impl_->pool.release(std::move(frame));
         });
 }
 
 void Server::broadcast(std::span<const uint8_t> data)
 {
-    auto payload = std::vector<uint8_t>(data.begin(), data.end());
+    if (data.size() > Protocol::MAX_PAYLOAD_SIZE)
+        return;
+
+    uint32_t size = static_cast<uint32_t>(data.size());
+    auto frame_template = impl_->pool.acquire(Protocol::HEADER_SIZE + size);
+    std::memcpy(frame_template.data(), &size, Protocol::HEADER_SIZE);
+    std::memcpy(frame_template.data() + Protocol::HEADER_SIZE, data.data(), size);
+
     boost::asio::post(impl_->server_strand,
-        [this, payload = std::move(payload)]()
+        [this, frame_template = std::move(frame_template)]() mutable
         {
             for (auto& [id, session] : impl_->sessions)
-                session->send(payload);
+            {
+                auto frame = impl_->pool.acquire(frame_template.size());
+                std::memcpy(frame.data(), frame_template.data(), frame_template.size());
+                session->enqueue_raw_frame(std::move(frame));
+            }
+            impl_->pool.release(std::move(frame_template));
         });
 }
 

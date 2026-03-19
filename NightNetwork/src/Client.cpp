@@ -1,5 +1,6 @@
 #include <NightNetwork/Client.h>
 
+#include "BufferPool.h"
 #include "Protocol.h"
 
 #include <atomic>
@@ -20,6 +21,8 @@ struct Client::Impl
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard;
     tcp::socket socket;
 
+    BufferPool pool{32};
+
     std::atomic<bool> connected = false;
 
     std::mutex receive_mutex;
@@ -37,6 +40,7 @@ struct Client::Impl
         : work_guard(boost::asio::make_work_guard(io))
         , socket(io)
     {
+        body_buf.reserve(Protocol::MAX_PAYLOAD_SIZE);
     }
 
     std::expected<void, std::string> connect(
@@ -107,8 +111,10 @@ struct Client::Impl
                 }
 
                 {
+                    auto copy = pool.acquire(body_buf.size());
+                    std::memcpy(copy.data(), body_buf.data(), body_buf.size());
                     std::lock_guard lock(receive_mutex);
-                    receive_queue.push(std::move(body_buf));
+                    receive_queue.push(std::move(copy));
                 }
                 do_read_header();
             });
@@ -120,7 +126,7 @@ struct Client::Impl
             return;
 
         uint32_t size = static_cast<uint32_t>(data.size());
-        std::vector<uint8_t> frame(Protocol::HEADER_SIZE + size);
+        auto frame = pool.acquire(Protocol::HEADER_SIZE + size);
         std::memcpy(frame.data(), &size, Protocol::HEADER_SIZE);
         std::memcpy(frame.data() + Protocol::HEADER_SIZE, data.data(), size);
 
@@ -144,6 +150,7 @@ struct Client::Impl
             boost::asio::buffer(front),
             [this](boost::system::error_code ec, std::size_t)
             {
+                pool.release(std::move(write_queue.front()));
                 write_queue.pop();
                 if (ec)
                 {
@@ -206,7 +213,7 @@ void Client::send(std::span<const uint8_t> data)
         return;
 
     uint32_t size = static_cast<uint32_t>(data.size());
-    auto frame = std::vector<uint8_t>(Protocol::HEADER_SIZE + size);
+    auto frame = impl_->pool.acquire(Protocol::HEADER_SIZE + size);
     std::memcpy(frame.data(), &size, Protocol::HEADER_SIZE);
     std::memcpy(frame.data() + Protocol::HEADER_SIZE, data.data(), size);
 
