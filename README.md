@@ -2,6 +2,14 @@
 
 Boost.Asio 기반 비동기 TCP Echo Server/Client 프로젝트.
 
+## 프로젝트 구조
+
+| 디렉터리 | 설명 |
+|----------|------|
+| [**NightNetwork**](NightNetwork/README.md) | TCP 네트워크 정적 라이브러리 (구조, API, 사용 예시는 링크 참조) |
+| **NightServer** | NightNetwork를 사용하는 에코 서버 애플리케이션 |
+| **NightClient** | NightNetwork를 사용하는 에코 클라이언트 애플리케이션 |
+
 ## 사전 요구 사항
 
 | 도구 | 비고 |
