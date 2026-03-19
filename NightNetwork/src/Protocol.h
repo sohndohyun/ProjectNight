@@ -31,7 +31,7 @@ struct Header
     uint8_t flags;
     uint32_t payload_size;
 
-    [[nodiscard]] bool is_keepalive() const
+    [[nodiscard]] constexpr bool is_keepalive() const
     {
         return (flags & FLAG_KEEPALIVE) != 0;
     }

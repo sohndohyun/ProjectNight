@@ -7,7 +7,7 @@
 
 int main()
 {
-    const unsigned short port = 12345;
+    constexpr unsigned short port = 12345;
 
     auto server = NightNetwork::Server::create(port);
     if (!server)
@@ -18,7 +18,7 @@ int main()
 
     std::println("=== Game Server 시작 (포트: {}) ===", port);
 
-    const auto tick_rate = std::chrono::milliseconds(33);
+    constexpr auto tick_rate = std::chrono::milliseconds(33);
     auto next_tick = std::chrono::steady_clock::now();
 
     while (true)

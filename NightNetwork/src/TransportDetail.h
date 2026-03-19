@@ -3,7 +3,6 @@
 #include "BufferPool.h"
 #include "Protocol.h"
 
-#include <bit>
 #include <cstring>
 #include <expected>
 #include <queue>
@@ -21,44 +20,29 @@ enum class HeaderDecodeError
     InvalidPayloadSize,
 };
 
-inline uint16_t to_big_endian(uint16_t value)
+constexpr uint16_t read_u16_be(const uint8_t* p)
 {
-    if constexpr (std::endian::native == std::endian::little)
-        return std::byteswap(value);
-
-    return value;
+    return static_cast<uint16_t>(p[0] << 8 | p[1]);
 }
 
-inline uint32_t to_big_endian(uint32_t value)
+constexpr uint32_t read_u32_be(const uint8_t* p)
 {
-    if constexpr (std::endian::native == std::endian::little)
-        return std::byteswap(value);
-
-    return value;
+    return static_cast<uint32_t>(p[0]) << 24
+         | static_cast<uint32_t>(p[1]) << 16
+         | static_cast<uint32_t>(p[2]) << 8
+         | static_cast<uint32_t>(p[3]);
 }
 
-inline uint16_t from_big_endian(uint16_t value)
+constexpr void write_header(uint8_t* output, uint8_t flags, uint32_t payload_size)
 {
-    return to_big_endian(value);
-}
-
-inline uint32_t from_big_endian(uint32_t value)
-{
-    return to_big_endian(value);
-}
-
-inline void write_header(uint8_t* output, uint8_t flags, uint32_t payload_size)
-{
-    auto magic_be = to_big_endian(Protocol::MAGIC);
-    auto payload_size_be = to_big_endian(payload_size);
-
-    std::memcpy(output + Protocol::MAGIC_OFFSET, &magic_be, sizeof(magic_be));
-    output[Protocol::VERSION_OFFSET] = Protocol::VERSION;
-    output[Protocol::FLAGS_OFFSET] = flags;
-    std::memcpy(
-        output + Protocol::PAYLOAD_SIZE_OFFSET,
-        &payload_size_be,
-        sizeof(payload_size_be));
+    output[Protocol::MAGIC_OFFSET]     = static_cast<uint8_t>(Protocol::MAGIC >> 8);
+    output[Protocol::MAGIC_OFFSET + 1] = static_cast<uint8_t>(Protocol::MAGIC & 0xFF);
+    output[Protocol::VERSION_OFFSET]   = Protocol::VERSION;
+    output[Protocol::FLAGS_OFFSET]     = flags;
+    output[Protocol::PAYLOAD_SIZE_OFFSET]     = static_cast<uint8_t>(payload_size >> 24);
+    output[Protocol::PAYLOAD_SIZE_OFFSET + 1] = static_cast<uint8_t>(payload_size >> 16);
+    output[Protocol::PAYLOAD_SIZE_OFFSET + 2] = static_cast<uint8_t>(payload_size >> 8);
+    output[Protocol::PAYLOAD_SIZE_OFFSET + 3] = static_cast<uint8_t>(payload_size);
 }
 
 inline std::vector<uint8_t> build_frame(
@@ -105,26 +89,14 @@ inline std::vector<uint8_t> clone_frame(
     return frame;
 }
 
-inline std::expected<Protocol::Header, HeaderDecodeError> decode_header(
+constexpr std::expected<Protocol::Header, HeaderDecodeError> decode_header(
     const uint8_t* input)
 {
-    uint16_t magic_be = 0;
-    uint32_t payload_size_be = 0;
-
-    std::memcpy(
-        &magic_be,
-        input + Protocol::MAGIC_OFFSET,
-        sizeof(magic_be));
-    std::memcpy(
-        &payload_size_be,
-        input + Protocol::PAYLOAD_SIZE_OFFSET,
-        sizeof(payload_size_be));
-
     Protocol::Header header{
-        .magic = from_big_endian(magic_be),
+        .magic = read_u16_be(input + Protocol::MAGIC_OFFSET),
         .version = input[Protocol::VERSION_OFFSET],
         .flags = input[Protocol::FLAGS_OFFSET],
-        .payload_size = from_big_endian(payload_size_be),
+        .payload_size = read_u32_be(input + Protocol::PAYLOAD_SIZE_OFFSET),
     };
 
     if (header.magic != Protocol::MAGIC)

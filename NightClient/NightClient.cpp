@@ -8,8 +8,8 @@
 
 int main()
 {
-    const std::string host = "localhost";
-    const unsigned short port = 12345;
+    constexpr auto host = "localhost";
+    constexpr unsigned short port = 12345;
 
     auto client = NightNetwork::Client::create(host, port);
     if (!client)
@@ -33,7 +33,7 @@ int main()
     });
     input_thread.detach();
 
-    const auto tick_rate = std::chrono::milliseconds(33);
+    constexpr auto tick_rate = std::chrono::milliseconds(33);
     auto next_tick = std::chrono::steady_clock::now();
 
     while (client->is_connected())
