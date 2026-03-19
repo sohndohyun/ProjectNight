@@ -4,6 +4,7 @@
 #include "Protocol.h"
 
 #include <atomic>
+#include <chrono>
 #include <cstring>
 #include <mutex>
 #include <queue>
@@ -34,11 +35,16 @@ struct Client::Impl
     uint8_t header_buf[Protocol::HEADER_SIZE];
     std::vector<uint8_t> body_buf;
 
+    boost::asio::steady_timer heartbeat_timer;
+    std::chrono::steady_clock::time_point last_activity;
+
     std::jthread io_thread;
 
     Impl()
         : work_guard(boost::asio::make_work_guard(io))
         , socket(io)
+        , heartbeat_timer(io)
+        , last_activity(std::chrono::steady_clock::now())
     {
         body_buf.reserve(Protocol::MAX_PAYLOAD_SIZE);
     }
@@ -64,10 +70,17 @@ struct Client::Impl
     void start_io()
     {
         do_read_header();
+        start_heartbeat();
         io_thread = std::jthread([this]()
         {
             io.run();
         });
+    }
+
+    void handle_disconnect()
+    {
+        heartbeat_timer.cancel();
+        connected.store(false, std::memory_order_relaxed);
     }
 
     void do_read_header()
@@ -79,16 +92,24 @@ struct Client::Impl
             {
                 if (ec)
                 {
-                    connected.store(false, std::memory_order_relaxed);
+                    handle_disconnect();
                     return;
                 }
+
+                last_activity = std::chrono::steady_clock::now();
 
                 uint32_t body_size = 0;
                 std::memcpy(&body_size, header_buf, Protocol::HEADER_SIZE);
 
-                if (body_size == 0 || body_size > Protocol::MAX_PAYLOAD_SIZE)
+                if (body_size == 0)
                 {
-                    connected.store(false, std::memory_order_relaxed);
+                    do_read_header();
+                    return;
+                }
+
+                if (body_size > Protocol::MAX_PAYLOAD_SIZE)
+                {
+                    handle_disconnect();
                     return;
                 }
 
@@ -106,7 +127,7 @@ struct Client::Impl
             {
                 if (ec)
                 {
-                    connected.store(false, std::memory_order_relaxed);
+                    handle_disconnect();
                     return;
                 }
 
@@ -154,11 +175,42 @@ struct Client::Impl
                 write_queue.pop();
                 if (ec)
                 {
-                    connected.store(false, std::memory_order_relaxed);
+                    handle_disconnect();
                     return;
                 }
                 do_write();
             });
+    }
+
+    void start_heartbeat()
+    {
+        heartbeat_timer.expires_after(Protocol::HEARTBEAT_INTERVAL);
+        heartbeat_timer.async_wait(
+            [this](boost::system::error_code ec)
+            {
+                if (ec)
+                    return;
+
+                auto elapsed = std::chrono::steady_clock::now() - last_activity;
+                if (elapsed >= Protocol::HEARTBEAT_TIMEOUT)
+                {
+                    handle_disconnect();
+                    return;
+                }
+
+                send_keepalive();
+                start_heartbeat();
+            });
+    }
+
+    void send_keepalive()
+    {
+        uint32_t zero = 0;
+        std::vector<uint8_t> frame(Protocol::HEADER_SIZE);
+        std::memcpy(frame.data(), &zero, Protocol::HEADER_SIZE);
+        write_queue.push(std::move(frame));
+        if (!writing)
+            do_write();
     }
 };
 

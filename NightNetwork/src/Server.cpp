@@ -209,4 +209,15 @@ void Server::broadcast(std::span<const uint8_t> data)
         });
 }
 
+void Server::disconnect(uint32_t session_id)
+{
+    boost::asio::post(impl_->server_strand,
+        [this, session_id]()
+        {
+            auto it = impl_->sessions.find(session_id);
+            if (it != impl_->sessions.end())
+                it->second->close();
+        });
+}
+
 } // namespace NightNetwork

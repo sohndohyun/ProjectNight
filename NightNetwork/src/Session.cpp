@@ -13,6 +13,8 @@ Session::Session(uint32_t id, tcp::socket socket, BufferPool& pool,
     , pool_(pool)
     , on_receive_(std::move(on_receive))
     , on_close_(std::move(on_close))
+    , heartbeat_timer_(strand_)
+    , last_activity_(std::chrono::steady_clock::now())
 {
     body_buf_.reserve(Protocol::MAX_PAYLOAD_SIZE);
 }
@@ -20,6 +22,7 @@ Session::Session(uint32_t id, tcp::socket socket, BufferPool& pool,
 void Session::start()
 {
     do_read_header();
+    start_heartbeat();
 }
 
 void Session::send(std::span<const uint8_t> payload)
@@ -53,6 +56,7 @@ void Session::close()
     boost::asio::post(strand_,
         [self = shared_from_this()]()
         {
+            self->heartbeat_timer_.cancel();
             boost::system::error_code ec;
             self->socket_.shutdown(tcp::socket::shutdown_both, ec);
             self->socket_.close(ec);
@@ -77,16 +81,24 @@ void Session::do_read_header()
             {
                 if (ec)
                 {
-                    on_close_(id_);
+                    handle_close();
                     return;
                 }
+
+                last_activity_ = std::chrono::steady_clock::now();
 
                 uint32_t body_size = 0;
                 std::memcpy(&body_size, header_buf_, Protocol::HEADER_SIZE);
 
-                if (body_size == 0 || body_size > Protocol::MAX_PAYLOAD_SIZE)
+                if (body_size == 0)
                 {
-                    on_close_(id_);
+                    do_read_header();
+                    return;
+                }
+
+                if (body_size > Protocol::MAX_PAYLOAD_SIZE)
+                {
+                    handle_close();
                     return;
                 }
 
@@ -106,7 +118,7 @@ void Session::do_read_body()
             {
                 if (ec)
                 {
-                    on_close_(id_);
+                    handle_close();
                     return;
                 }
 
@@ -138,11 +150,47 @@ void Session::do_write()
                 write_queue_.pop();
                 if (ec)
                 {
-                    on_close_(id_);
+                    handle_close();
                     return;
                 }
                 do_write();
             }));
+}
+
+void Session::start_heartbeat()
+{
+    heartbeat_timer_.expires_after(Protocol::HEARTBEAT_INTERVAL);
+    heartbeat_timer_.async_wait(
+        boost::asio::bind_executor(strand_,
+            [self = shared_from_this()](boost::system::error_code ec)
+            {
+                if (ec)
+                    return;
+
+                auto elapsed = std::chrono::steady_clock::now() - self->last_activity_;
+                if (elapsed >= Protocol::HEARTBEAT_TIMEOUT)
+                {
+                    self->handle_close();
+                    return;
+                }
+
+                self->send_keepalive();
+                self->start_heartbeat();
+            }));
+}
+
+void Session::send_keepalive()
+{
+    uint32_t zero = 0;
+    std::vector<uint8_t> frame(Protocol::HEADER_SIZE);
+    std::memcpy(frame.data(), &zero, Protocol::HEADER_SIZE);
+    enqueue_write(std::move(frame));
+}
+
+void Session::handle_close()
+{
+    heartbeat_timer_.cancel();
+    on_close_(id_);
 }
 
 } // namespace NightNetwork

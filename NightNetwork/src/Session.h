@@ -3,6 +3,7 @@
 #include "BufferPool.h"
 #include "Protocol.h"
 
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -60,6 +61,9 @@ private:
     void do_read_header();
     void do_read_body();
     void do_write();
+    void start_heartbeat();
+    void send_keepalive();
+    void handle_close();
 
     uint32_t id_;
     tcp::socket socket_;
@@ -73,6 +77,9 @@ private:
 
     std::queue<std::vector<uint8_t>> write_queue_;
     bool writing_ = false;
+
+    boost::asio::steady_timer heartbeat_timer_;
+    std::chrono::steady_clock::time_point last_activity_;
 };
 
 } // namespace NightNetwork

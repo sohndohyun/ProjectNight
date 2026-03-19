@@ -62,6 +62,14 @@ public:
     /// </summary>
     void broadcast(std::span<const uint8_t> data);
 
+    /// <summary>
+    /// 특정 세션을 강제 종료한다. 소켓을 graceful shutdown한 뒤
+    /// Disconnect 이벤트가 poll_packet()으로 전달된다.
+    /// 이미 없는 session_id에 대해서는 안전하게 무시된다.
+    /// I/O 스레드로 post 되므로 게임 스레드에서 자유롭게 호출 가능하다.
+    /// </summary>
+    void disconnect(uint32_t session_id);
+
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
