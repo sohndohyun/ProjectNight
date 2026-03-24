@@ -8,8 +8,6 @@
             "binaryDir": "${sourceDir}/out/build/${presetName}",
             "installDir": "${sourceDir}/out/install/${presetName}",
             "cacheVariables": {
-                "CMAKE_C_COMPILER": "cl.exe",
-                "CMAKE_CXX_COMPILER": "cl.exe",
                 "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake"
             },
             "condition": {
@@ -27,6 +25,8 @@
                 "strategy": "external"
             },
             "cacheVariables": {
+                "CMAKE_C_COMPILER": "$penv{VCToolsInstallDir}bin/Hostx64/x64/cl.exe",
+                "CMAKE_CXX_COMPILER": "$penv{VCToolsInstallDir}bin/Hostx64/x64/cl.exe",
                 "CMAKE_BUILD_TYPE": "Debug"
             }
         },
@@ -47,6 +47,8 @@
                 "strategy": "external"
             },
             "cacheVariables": {
+                "CMAKE_C_COMPILER": "$penv{VCToolsInstallDir}bin/Hostx86/x86/cl.exe",
+                "CMAKE_CXX_COMPILER": "$penv{VCToolsInstallDir}bin/Hostx86/x86/cl.exe",
                 "CMAKE_BUILD_TYPE": "Debug"
             }
         },
