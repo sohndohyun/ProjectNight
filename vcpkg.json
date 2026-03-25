@@ -4,6 +4,7 @@
     "dependencies": [
         "boost-asio",
         "boost-lockfree",
-        "flatbuffers"
+        "flatbuffers",
+        "wxwidgets"
     ]
 }

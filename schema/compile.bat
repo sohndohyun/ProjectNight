@@ -1,15 +1,24 @@
 @echo off
 setlocal
 
-set SCRIPT_DIR=%~dp0
-set ROOT_DIR=%SCRIPT_DIR%..
-set OUTPUT_DIR=%ROOT_DIR%\NightCommon\NightProtocol
+set "SCRIPT_DIR=%~dp0"
+for %%I in ("%SCRIPT_DIR%..") do set "ROOT_DIR=%%~fI"
+set "OUTPUT_DIR=%ROOT_DIR%\NightCommon\NightProtocol"
 
-:: vcpkg tools에서 flatc 탐색
-set FLATC=
-set VCPKG_FLATC=%ROOT_DIR%\build\vcpkg_installed\x64-windows\tools\flatbuffers\flatc.exe
-if exist "%VCPKG_FLATC%" (
-    set "FLATC=%VCPKG_FLATC%"
+set "FLATC="
+for %%F in (
+    "%ROOT_DIR%\build\vcpkg_installed\x64-windows\tools\flatbuffers\flatc.exe"
+    "%ROOT_DIR%\out\build\x64-debug\vcpkg_installed\x64-windows\tools\flatbuffers\flatc.exe"
+    "%ROOT_DIR%\out\build\x64-release\vcpkg_installed\x64-windows\tools\flatbuffers\flatc.exe"
+    "%ROOT_DIR%\vcpkg_installed\x64-windows\tools\flatbuffers\flatc.exe"
+) do (
+    if not defined FLATC if exist "%%~F" set "FLATC=%%~F"
+)
+
+if not defined FLATC (
+    for /f "delims=" %%F in ('dir /b /s "%ROOT_DIR%\out\build\*\vcpkg_installed\x64-windows\tools\flatbuffers\flatc.exe" 2^>nul') do (
+        if not defined FLATC set "FLATC=%%~F"
+    )
 )
 
 if not defined FLATC (
@@ -19,24 +28,37 @@ if not defined FLATC (
     ) else (
         echo [ERROR] flatc.exe not found.
         echo         Build the project first or add flatc to PATH.
+        pause
         exit /b 1
     )
 )
 
 if not exist "%OUTPUT_DIR%" mkdir "%OUTPUT_DIR%"
 
-echo Using flatc: %FLATC%
+set "HAS_SCHEMA=0"
+set "FAIL=0"
 
-set FAIL=0
-for %%s in ("%SCRIPT_DIR%*.fbs") do (
-    echo Compiling: %%~nxs
-    "%FLATC%" --cpp --scoped-enums -o "%OUTPUT_DIR%" "%%s"
-    if errorlevel 1 set FAIL=1
+echo Using flatc: %FLATC%
+for %%S in ("%SCRIPT_DIR%*.fbs") do (
+    set "HAS_SCHEMA=1"
+    echo Compiling: %%~nxS
+    "%FLATC%" --cpp --scoped-enums -o "%OUTPUT_DIR%" "%%~fS"
+    if errorlevel 1 set "FAIL=1"
 )
 
-if %FAIL% equ 0 (
+if "%HAS_SCHEMA%" equ "0" (
+    echo [ERROR] No .fbs files found in %SCRIPT_DIR%
+    pause
+    exit /b 1
+)
+
+if "%FAIL%" equ "0" (
     echo Schema compilation succeeded.
 ) else (
     echo [ERROR] Schema compilation failed.
+    pause
     exit /b 1
 )
+
+pause
+exit /b 0

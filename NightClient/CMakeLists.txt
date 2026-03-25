@@ -1,3 +1,16 @@
-add_executable(NightClient "NightClient.cpp")
+find_package(wxWidgets CONFIG REQUIRED COMPONENTS base core)
 
-target_link_libraries(NightClient PRIVATE NightNetwork NightCommon)
+add_executable(NightClient WIN32
+    NightClient.cpp
+    ChatClientFrame.cpp
+    ChatClientFrame.h
+    ChatProtocolClient.cpp
+    ChatProtocolClient.h
+)
+
+target_link_libraries(NightClient
+    PRIVATE
+        NightNetwork
+        NightCommon
+        wxWidgets::wxWidgets
+)

@@ -1,30 +1,118 @@
 namespace NightProtocol;
 
-table ChatMessage {
+enum ErrorCode : ushort {
+    NONE = 0,
+    INVALID_NAME,
+    DUPLICATE_NAME,
+    ROOM_NOT_FOUND,
+    ROOM_FULL,
+    NOT_IN_ROOM,
+    INVALID_MESSAGE,
+    ALREADY_IN_ROOM,
+    INTERNAL_ERROR,
+}
+
+table UserInfo {
+    user_id: uint32;
+    display_name: string;
+}
+
+table RoomInfo {
+    room_id: uint32;
+    room_name: string;
+    user_count: uint32;
+}
+
+table LoginRequest {
+    display_name: string;
+}
+
+table LoginResponse {
+    success: bool = false;
+    error_code: ErrorCode = NONE;
+    user: UserInfo;
+}
+
+table RoomListRequest {
+}
+
+table RoomListResponse {
+    rooms: [RoomInfo];
+}
+
+table JoinRoomRequest {
+    room_id: uint32;
+}
+
+table JoinRoomResponse {
+    success: bool = false;
+    error_code: ErrorCode = NONE;
+    room: RoomInfo;
+}
+
+table ChatSendRequest {
     content: string;
 }
 
-struct Vec2 {
-    x: float;
-    y: float;
+table ChatBroadcast {
+    room_id: uint32;
+    sender_id: uint32;
+    sender_name: string;
+    content: string;
+    timestamp: ulong;
 }
 
-table MoveRequest {
-    position: Vec2;
+table LeaveRoomRequest {
 }
 
-table StateSync {
-    session_id: uint32;
-    position: Vec2;
+table LeaveRoomResponse {
+    success: bool = false;
+    error_code: ErrorCode = NONE;
+}
+
+table DisconnectRequest {
+}
+
+table DisconnectResponse {
+    success: bool = false;
+    error_code: ErrorCode = NONE;
+}
+
+table UserJoinedEvent {
+    room_id: uint32;
+    user: UserInfo;
+}
+
+table UserLeftEvent {
+    room_id: uint32;
+    user: UserInfo;
+}
+
+table SystemMessageEvent {
+    room_id: uint32;
+    content: string;
 }
 
 union MessagePayload {
-    ChatMessage,
-    MoveRequest,
-    StateSync,
+    LoginRequest,
+    LoginResponse,
+    RoomListRequest,
+    RoomListResponse,
+    JoinRoomRequest,
+    JoinRoomResponse,
+    ChatSendRequest,
+    ChatBroadcast,
+    LeaveRoomRequest,
+    LeaveRoomResponse,
+    DisconnectRequest,
+    DisconnectResponse,
+    UserJoinedEvent,
+    UserLeftEvent,
+    SystemMessageEvent,
 }
 
 table Message {
+    request_id: uint32;
     payload: MessagePayload;
 }
 

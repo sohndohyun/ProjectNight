@@ -15,52 +15,179 @@ static_assert(FLATBUFFERS_VERSION_MAJOR == 25 &&
 
 namespace NightProtocol {
 
-struct ChatMessage;
-struct ChatMessageBuilder;
+struct UserInfo;
+struct UserInfoBuilder;
 
-struct Vec2;
+struct RoomInfo;
+struct RoomInfoBuilder;
 
-struct MoveRequest;
-struct MoveRequestBuilder;
+struct LoginRequest;
+struct LoginRequestBuilder;
 
-struct StateSync;
-struct StateSyncBuilder;
+struct LoginResponse;
+struct LoginResponseBuilder;
+
+struct RoomListRequest;
+struct RoomListRequestBuilder;
+
+struct RoomListResponse;
+struct RoomListResponseBuilder;
+
+struct JoinRoomRequest;
+struct JoinRoomRequestBuilder;
+
+struct JoinRoomResponse;
+struct JoinRoomResponseBuilder;
+
+struct ChatSendRequest;
+struct ChatSendRequestBuilder;
+
+struct ChatBroadcast;
+struct ChatBroadcastBuilder;
+
+struct LeaveRoomRequest;
+struct LeaveRoomRequestBuilder;
+
+struct LeaveRoomResponse;
+struct LeaveRoomResponseBuilder;
+
+struct DisconnectRequest;
+struct DisconnectRequestBuilder;
+
+struct DisconnectResponse;
+struct DisconnectResponseBuilder;
+
+struct UserJoinedEvent;
+struct UserJoinedEventBuilder;
+
+struct UserLeftEvent;
+struct UserLeftEventBuilder;
+
+struct SystemMessageEvent;
+struct SystemMessageEventBuilder;
 
 struct Message;
 struct MessageBuilder;
 
-enum class MessagePayload : uint8_t {
+enum class ErrorCode : uint16_t {
   NONE = 0,
-  ChatMessage = 1,
-  MoveRequest = 2,
-  StateSync = 3,
+  INVALID_NAME = 1,
+  DUPLICATE_NAME = 2,
+  ROOM_NOT_FOUND = 3,
+  ROOM_FULL = 4,
+  NOT_IN_ROOM = 5,
+  INVALID_MESSAGE = 6,
+  ALREADY_IN_ROOM = 7,
+  INTERNAL_ERROR = 8,
   MIN = NONE,
-  MAX = StateSync
+  MAX = INTERNAL_ERROR
 };
 
-inline const MessagePayload (&EnumValuesMessagePayload())[4] {
+inline const ErrorCode (&EnumValuesErrorCode())[9] {
+  static const ErrorCode values[] = {
+    ErrorCode::NONE,
+    ErrorCode::INVALID_NAME,
+    ErrorCode::DUPLICATE_NAME,
+    ErrorCode::ROOM_NOT_FOUND,
+    ErrorCode::ROOM_FULL,
+    ErrorCode::NOT_IN_ROOM,
+    ErrorCode::INVALID_MESSAGE,
+    ErrorCode::ALREADY_IN_ROOM,
+    ErrorCode::INTERNAL_ERROR
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesErrorCode() {
+  static const char * const names[10] = {
+    "NONE",
+    "INVALID_NAME",
+    "DUPLICATE_NAME",
+    "ROOM_NOT_FOUND",
+    "ROOM_FULL",
+    "NOT_IN_ROOM",
+    "INVALID_MESSAGE",
+    "ALREADY_IN_ROOM",
+    "INTERNAL_ERROR",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameErrorCode(ErrorCode e) {
+  if (::flatbuffers::IsOutRange(e, ErrorCode::NONE, ErrorCode::INTERNAL_ERROR)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesErrorCode()[index];
+}
+
+enum class MessagePayload : uint8_t {
+  NONE = 0,
+  LoginRequest = 1,
+  LoginResponse = 2,
+  RoomListRequest = 3,
+  RoomListResponse = 4,
+  JoinRoomRequest = 5,
+  JoinRoomResponse = 6,
+  ChatSendRequest = 7,
+  ChatBroadcast = 8,
+  LeaveRoomRequest = 9,
+  LeaveRoomResponse = 10,
+  DisconnectRequest = 11,
+  DisconnectResponse = 12,
+  UserJoinedEvent = 13,
+  UserLeftEvent = 14,
+  SystemMessageEvent = 15,
+  MIN = NONE,
+  MAX = SystemMessageEvent
+};
+
+inline const MessagePayload (&EnumValuesMessagePayload())[16] {
   static const MessagePayload values[] = {
     MessagePayload::NONE,
-    MessagePayload::ChatMessage,
-    MessagePayload::MoveRequest,
-    MessagePayload::StateSync
+    MessagePayload::LoginRequest,
+    MessagePayload::LoginResponse,
+    MessagePayload::RoomListRequest,
+    MessagePayload::RoomListResponse,
+    MessagePayload::JoinRoomRequest,
+    MessagePayload::JoinRoomResponse,
+    MessagePayload::ChatSendRequest,
+    MessagePayload::ChatBroadcast,
+    MessagePayload::LeaveRoomRequest,
+    MessagePayload::LeaveRoomResponse,
+    MessagePayload::DisconnectRequest,
+    MessagePayload::DisconnectResponse,
+    MessagePayload::UserJoinedEvent,
+    MessagePayload::UserLeftEvent,
+    MessagePayload::SystemMessageEvent
   };
   return values;
 }
 
 inline const char * const *EnumNamesMessagePayload() {
-  static const char * const names[5] = {
+  static const char * const names[17] = {
     "NONE",
-    "ChatMessage",
-    "MoveRequest",
-    "StateSync",
+    "LoginRequest",
+    "LoginResponse",
+    "RoomListRequest",
+    "RoomListResponse",
+    "JoinRoomRequest",
+    "JoinRoomResponse",
+    "ChatSendRequest",
+    "ChatBroadcast",
+    "LeaveRoomRequest",
+    "LeaveRoomResponse",
+    "DisconnectRequest",
+    "DisconnectResponse",
+    "UserJoinedEvent",
+    "UserLeftEvent",
+    "SystemMessageEvent",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameMessagePayload(MessagePayload e) {
-  if (::flatbuffers::IsOutRange(e, MessagePayload::NONE, MessagePayload::StateSync)) return "";
+  if (::flatbuffers::IsOutRange(e, MessagePayload::NONE, MessagePayload::SystemMessageEvent)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesMessagePayload()[index];
 }
@@ -69,16 +196,64 @@ template<typename T> struct MessagePayloadTraits {
   static const MessagePayload enum_value = MessagePayload::NONE;
 };
 
-template<> struct MessagePayloadTraits<NightProtocol::ChatMessage> {
-  static const MessagePayload enum_value = MessagePayload::ChatMessage;
+template<> struct MessagePayloadTraits<NightProtocol::LoginRequest> {
+  static const MessagePayload enum_value = MessagePayload::LoginRequest;
 };
 
-template<> struct MessagePayloadTraits<NightProtocol::MoveRequest> {
-  static const MessagePayload enum_value = MessagePayload::MoveRequest;
+template<> struct MessagePayloadTraits<NightProtocol::LoginResponse> {
+  static const MessagePayload enum_value = MessagePayload::LoginResponse;
 };
 
-template<> struct MessagePayloadTraits<NightProtocol::StateSync> {
-  static const MessagePayload enum_value = MessagePayload::StateSync;
+template<> struct MessagePayloadTraits<NightProtocol::RoomListRequest> {
+  static const MessagePayload enum_value = MessagePayload::RoomListRequest;
+};
+
+template<> struct MessagePayloadTraits<NightProtocol::RoomListResponse> {
+  static const MessagePayload enum_value = MessagePayload::RoomListResponse;
+};
+
+template<> struct MessagePayloadTraits<NightProtocol::JoinRoomRequest> {
+  static const MessagePayload enum_value = MessagePayload::JoinRoomRequest;
+};
+
+template<> struct MessagePayloadTraits<NightProtocol::JoinRoomResponse> {
+  static const MessagePayload enum_value = MessagePayload::JoinRoomResponse;
+};
+
+template<> struct MessagePayloadTraits<NightProtocol::ChatSendRequest> {
+  static const MessagePayload enum_value = MessagePayload::ChatSendRequest;
+};
+
+template<> struct MessagePayloadTraits<NightProtocol::ChatBroadcast> {
+  static const MessagePayload enum_value = MessagePayload::ChatBroadcast;
+};
+
+template<> struct MessagePayloadTraits<NightProtocol::LeaveRoomRequest> {
+  static const MessagePayload enum_value = MessagePayload::LeaveRoomRequest;
+};
+
+template<> struct MessagePayloadTraits<NightProtocol::LeaveRoomResponse> {
+  static const MessagePayload enum_value = MessagePayload::LeaveRoomResponse;
+};
+
+template<> struct MessagePayloadTraits<NightProtocol::DisconnectRequest> {
+  static const MessagePayload enum_value = MessagePayload::DisconnectRequest;
+};
+
+template<> struct MessagePayloadTraits<NightProtocol::DisconnectResponse> {
+  static const MessagePayload enum_value = MessagePayload::DisconnectResponse;
+};
+
+template<> struct MessagePayloadTraits<NightProtocol::UserJoinedEvent> {
+  static const MessagePayload enum_value = MessagePayload::UserJoinedEvent;
+};
+
+template<> struct MessagePayloadTraits<NightProtocol::UserLeftEvent> {
+  static const MessagePayload enum_value = MessagePayload::UserLeftEvent;
+};
+
+template<> struct MessagePayloadTraits<NightProtocol::SystemMessageEvent> {
+  static const MessagePayload enum_value = MessagePayload::SystemMessageEvent;
 };
 
 template <bool B = false>
@@ -86,31 +261,451 @@ bool VerifyMessagePayload(::flatbuffers::VerifierTemplate<B> &verifier, const vo
 template <bool B = false>
 bool VerifyMessagePayloadVector(::flatbuffers::VerifierTemplate<B> &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<MessagePayload> *types);
 
-FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) Vec2 FLATBUFFERS_FINAL_CLASS {
- private:
-  float x_;
-  float y_;
-
- public:
-  Vec2()
-      : x_(0),
-        y_(0) {
+struct UserInfo FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef UserInfoBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_USER_ID = 4,
+    VT_DISPLAY_NAME = 6
+  };
+  uint32_t user_id() const {
+    return GetField<uint32_t>(VT_USER_ID, 0);
   }
-  Vec2(float _x, float _y)
-      : x_(::flatbuffers::EndianScalar(_x)),
-        y_(::flatbuffers::EndianScalar(_y)) {
+  const ::flatbuffers::String *display_name() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_DISPLAY_NAME);
   }
-  float x() const {
-    return ::flatbuffers::EndianScalar(x_);
-  }
-  float y() const {
-    return ::flatbuffers::EndianScalar(y_);
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint32_t>(verifier, VT_USER_ID, 4) &&
+           VerifyOffset(verifier, VT_DISPLAY_NAME) &&
+           verifier.VerifyString(display_name()) &&
+           verifier.EndTable();
   }
 };
-FLATBUFFERS_STRUCT_END(Vec2, 8);
 
-struct ChatMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
-  typedef ChatMessageBuilder Builder;
+struct UserInfoBuilder {
+  typedef UserInfo Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_user_id(uint32_t user_id) {
+    fbb_.AddElement<uint32_t>(UserInfo::VT_USER_ID, user_id, 0);
+  }
+  void add_display_name(::flatbuffers::Offset<::flatbuffers::String> display_name) {
+    fbb_.AddOffset(UserInfo::VT_DISPLAY_NAME, display_name);
+  }
+  explicit UserInfoBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<UserInfo> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<UserInfo>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<UserInfo> CreateUserInfo(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint32_t user_id = 0,
+    ::flatbuffers::Offset<::flatbuffers::String> display_name = 0) {
+  UserInfoBuilder builder_(_fbb);
+  builder_.add_display_name(display_name);
+  builder_.add_user_id(user_id);
+  return builder_.Finish();
+}
+
+inline ::flatbuffers::Offset<UserInfo> CreateUserInfoDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint32_t user_id = 0,
+    const char *display_name = nullptr) {
+  auto display_name__ = display_name ? _fbb.CreateString(display_name) : 0;
+  return NightProtocol::CreateUserInfo(
+      _fbb,
+      user_id,
+      display_name__);
+}
+
+struct RoomInfo FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef RoomInfoBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_ROOM_ID = 4,
+    VT_ROOM_NAME = 6,
+    VT_USER_COUNT = 8
+  };
+  uint32_t room_id() const {
+    return GetField<uint32_t>(VT_ROOM_ID, 0);
+  }
+  const ::flatbuffers::String *room_name() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_ROOM_NAME);
+  }
+  uint32_t user_count() const {
+    return GetField<uint32_t>(VT_USER_COUNT, 0);
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint32_t>(verifier, VT_ROOM_ID, 4) &&
+           VerifyOffset(verifier, VT_ROOM_NAME) &&
+           verifier.VerifyString(room_name()) &&
+           VerifyField<uint32_t>(verifier, VT_USER_COUNT, 4) &&
+           verifier.EndTable();
+  }
+};
+
+struct RoomInfoBuilder {
+  typedef RoomInfo Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_room_id(uint32_t room_id) {
+    fbb_.AddElement<uint32_t>(RoomInfo::VT_ROOM_ID, room_id, 0);
+  }
+  void add_room_name(::flatbuffers::Offset<::flatbuffers::String> room_name) {
+    fbb_.AddOffset(RoomInfo::VT_ROOM_NAME, room_name);
+  }
+  void add_user_count(uint32_t user_count) {
+    fbb_.AddElement<uint32_t>(RoomInfo::VT_USER_COUNT, user_count, 0);
+  }
+  explicit RoomInfoBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<RoomInfo> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<RoomInfo>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<RoomInfo> CreateRoomInfo(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint32_t room_id = 0,
+    ::flatbuffers::Offset<::flatbuffers::String> room_name = 0,
+    uint32_t user_count = 0) {
+  RoomInfoBuilder builder_(_fbb);
+  builder_.add_user_count(user_count);
+  builder_.add_room_name(room_name);
+  builder_.add_room_id(room_id);
+  return builder_.Finish();
+}
+
+inline ::flatbuffers::Offset<RoomInfo> CreateRoomInfoDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint32_t room_id = 0,
+    const char *room_name = nullptr,
+    uint32_t user_count = 0) {
+  auto room_name__ = room_name ? _fbb.CreateString(room_name) : 0;
+  return NightProtocol::CreateRoomInfo(
+      _fbb,
+      room_id,
+      room_name__,
+      user_count);
+}
+
+struct LoginRequest FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef LoginRequestBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_DISPLAY_NAME = 4
+  };
+  const ::flatbuffers::String *display_name() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_DISPLAY_NAME);
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_DISPLAY_NAME) &&
+           verifier.VerifyString(display_name()) &&
+           verifier.EndTable();
+  }
+};
+
+struct LoginRequestBuilder {
+  typedef LoginRequest Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_display_name(::flatbuffers::Offset<::flatbuffers::String> display_name) {
+    fbb_.AddOffset(LoginRequest::VT_DISPLAY_NAME, display_name);
+  }
+  explicit LoginRequestBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<LoginRequest> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<LoginRequest>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<LoginRequest> CreateLoginRequest(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<::flatbuffers::String> display_name = 0) {
+  LoginRequestBuilder builder_(_fbb);
+  builder_.add_display_name(display_name);
+  return builder_.Finish();
+}
+
+inline ::flatbuffers::Offset<LoginRequest> CreateLoginRequestDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const char *display_name = nullptr) {
+  auto display_name__ = display_name ? _fbb.CreateString(display_name) : 0;
+  return NightProtocol::CreateLoginRequest(
+      _fbb,
+      display_name__);
+}
+
+struct LoginResponse FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef LoginResponseBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_SUCCESS = 4,
+    VT_ERROR_CODE = 6,
+    VT_USER = 8
+  };
+  bool success() const {
+    return GetField<uint8_t>(VT_SUCCESS, 0) != 0;
+  }
+  NightProtocol::ErrorCode error_code() const {
+    return static_cast<NightProtocol::ErrorCode>(GetField<uint16_t>(VT_ERROR_CODE, 0));
+  }
+  const NightProtocol::UserInfo *user() const {
+    return GetPointer<const NightProtocol::UserInfo *>(VT_USER);
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_SUCCESS, 1) &&
+           VerifyField<uint16_t>(verifier, VT_ERROR_CODE, 2) &&
+           VerifyOffset(verifier, VT_USER) &&
+           verifier.VerifyTable(user()) &&
+           verifier.EndTable();
+  }
+};
+
+struct LoginResponseBuilder {
+  typedef LoginResponse Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_success(bool success) {
+    fbb_.AddElement<uint8_t>(LoginResponse::VT_SUCCESS, static_cast<uint8_t>(success), 0);
+  }
+  void add_error_code(NightProtocol::ErrorCode error_code) {
+    fbb_.AddElement<uint16_t>(LoginResponse::VT_ERROR_CODE, static_cast<uint16_t>(error_code), 0);
+  }
+  void add_user(::flatbuffers::Offset<NightProtocol::UserInfo> user) {
+    fbb_.AddOffset(LoginResponse::VT_USER, user);
+  }
+  explicit LoginResponseBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<LoginResponse> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<LoginResponse>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<LoginResponse> CreateLoginResponse(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool success = false,
+    NightProtocol::ErrorCode error_code = NightProtocol::ErrorCode::NONE,
+    ::flatbuffers::Offset<NightProtocol::UserInfo> user = 0) {
+  LoginResponseBuilder builder_(_fbb);
+  builder_.add_user(user);
+  builder_.add_error_code(error_code);
+  builder_.add_success(success);
+  return builder_.Finish();
+}
+
+struct RoomListRequest FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef RoomListRequestBuilder Builder;
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           verifier.EndTable();
+  }
+};
+
+struct RoomListRequestBuilder {
+  typedef RoomListRequest Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  explicit RoomListRequestBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<RoomListRequest> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<RoomListRequest>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<RoomListRequest> CreateRoomListRequest(
+    ::flatbuffers::FlatBufferBuilder &_fbb) {
+  RoomListRequestBuilder builder_(_fbb);
+  return builder_.Finish();
+}
+
+struct RoomListResponse FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef RoomListResponseBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_ROOMS = 4
+  };
+  const ::flatbuffers::Vector<::flatbuffers::Offset<NightProtocol::RoomInfo>> *rooms() const {
+    return GetPointer<const ::flatbuffers::Vector<::flatbuffers::Offset<NightProtocol::RoomInfo>> *>(VT_ROOMS);
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_ROOMS) &&
+           verifier.VerifyVector(rooms()) &&
+           verifier.VerifyVectorOfTables(rooms()) &&
+           verifier.EndTable();
+  }
+};
+
+struct RoomListResponseBuilder {
+  typedef RoomListResponse Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_rooms(::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<NightProtocol::RoomInfo>>> rooms) {
+    fbb_.AddOffset(RoomListResponse::VT_ROOMS, rooms);
+  }
+  explicit RoomListResponseBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<RoomListResponse> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<RoomListResponse>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<RoomListResponse> CreateRoomListResponse(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<NightProtocol::RoomInfo>>> rooms = 0) {
+  RoomListResponseBuilder builder_(_fbb);
+  builder_.add_rooms(rooms);
+  return builder_.Finish();
+}
+
+inline ::flatbuffers::Offset<RoomListResponse> CreateRoomListResponseDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const std::vector<::flatbuffers::Offset<NightProtocol::RoomInfo>> *rooms = nullptr) {
+  auto rooms__ = rooms ? _fbb.CreateVector<::flatbuffers::Offset<NightProtocol::RoomInfo>>(*rooms) : 0;
+  return NightProtocol::CreateRoomListResponse(
+      _fbb,
+      rooms__);
+}
+
+struct JoinRoomRequest FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef JoinRoomRequestBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_ROOM_ID = 4
+  };
+  uint32_t room_id() const {
+    return GetField<uint32_t>(VT_ROOM_ID, 0);
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint32_t>(verifier, VT_ROOM_ID, 4) &&
+           verifier.EndTable();
+  }
+};
+
+struct JoinRoomRequestBuilder {
+  typedef JoinRoomRequest Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_room_id(uint32_t room_id) {
+    fbb_.AddElement<uint32_t>(JoinRoomRequest::VT_ROOM_ID, room_id, 0);
+  }
+  explicit JoinRoomRequestBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<JoinRoomRequest> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<JoinRoomRequest>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<JoinRoomRequest> CreateJoinRoomRequest(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint32_t room_id = 0) {
+  JoinRoomRequestBuilder builder_(_fbb);
+  builder_.add_room_id(room_id);
+  return builder_.Finish();
+}
+
+struct JoinRoomResponse FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef JoinRoomResponseBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_SUCCESS = 4,
+    VT_ERROR_CODE = 6,
+    VT_ROOM = 8
+  };
+  bool success() const {
+    return GetField<uint8_t>(VT_SUCCESS, 0) != 0;
+  }
+  NightProtocol::ErrorCode error_code() const {
+    return static_cast<NightProtocol::ErrorCode>(GetField<uint16_t>(VT_ERROR_CODE, 0));
+  }
+  const NightProtocol::RoomInfo *room() const {
+    return GetPointer<const NightProtocol::RoomInfo *>(VT_ROOM);
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_SUCCESS, 1) &&
+           VerifyField<uint16_t>(verifier, VT_ERROR_CODE, 2) &&
+           VerifyOffset(verifier, VT_ROOM) &&
+           verifier.VerifyTable(room()) &&
+           verifier.EndTable();
+  }
+};
+
+struct JoinRoomResponseBuilder {
+  typedef JoinRoomResponse Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_success(bool success) {
+    fbb_.AddElement<uint8_t>(JoinRoomResponse::VT_SUCCESS, static_cast<uint8_t>(success), 0);
+  }
+  void add_error_code(NightProtocol::ErrorCode error_code) {
+    fbb_.AddElement<uint16_t>(JoinRoomResponse::VT_ERROR_CODE, static_cast<uint16_t>(error_code), 0);
+  }
+  void add_room(::flatbuffers::Offset<NightProtocol::RoomInfo> room) {
+    fbb_.AddOffset(JoinRoomResponse::VT_ROOM, room);
+  }
+  explicit JoinRoomResponseBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<JoinRoomResponse> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<JoinRoomResponse>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<JoinRoomResponse> CreateJoinRoomResponse(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool success = false,
+    NightProtocol::ErrorCode error_code = NightProtocol::ErrorCode::NONE,
+    ::flatbuffers::Offset<NightProtocol::RoomInfo> room = 0) {
+  JoinRoomResponseBuilder builder_(_fbb);
+  builder_.add_room(room);
+  builder_.add_error_code(error_code);
+  builder_.add_success(success);
+  return builder_.Finish();
+}
+
+struct ChatSendRequest FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef ChatSendRequestBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_CONTENT = 4
   };
@@ -126,141 +721,487 @@ struct ChatMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
 };
 
-struct ChatMessageBuilder {
-  typedef ChatMessage Table;
+struct ChatSendRequestBuilder {
+  typedef ChatSendRequest Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
   void add_content(::flatbuffers::Offset<::flatbuffers::String> content) {
-    fbb_.AddOffset(ChatMessage::VT_CONTENT, content);
+    fbb_.AddOffset(ChatSendRequest::VT_CONTENT, content);
   }
-  explicit ChatMessageBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+  explicit ChatSendRequestBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  ::flatbuffers::Offset<ChatMessage> Finish() {
+  ::flatbuffers::Offset<ChatSendRequest> Finish() {
     const auto end = fbb_.EndTable(start_);
-    auto o = ::flatbuffers::Offset<ChatMessage>(end);
+    auto o = ::flatbuffers::Offset<ChatSendRequest>(end);
     return o;
   }
 };
 
-inline ::flatbuffers::Offset<ChatMessage> CreateChatMessage(
+inline ::flatbuffers::Offset<ChatSendRequest> CreateChatSendRequest(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     ::flatbuffers::Offset<::flatbuffers::String> content = 0) {
-  ChatMessageBuilder builder_(_fbb);
+  ChatSendRequestBuilder builder_(_fbb);
   builder_.add_content(content);
   return builder_.Finish();
 }
 
-inline ::flatbuffers::Offset<ChatMessage> CreateChatMessageDirect(
+inline ::flatbuffers::Offset<ChatSendRequest> CreateChatSendRequestDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     const char *content = nullptr) {
   auto content__ = content ? _fbb.CreateString(content) : 0;
-  return NightProtocol::CreateChatMessage(
+  return NightProtocol::CreateChatSendRequest(
       _fbb,
       content__);
 }
 
-struct MoveRequest FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
-  typedef MoveRequestBuilder Builder;
+struct ChatBroadcast FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef ChatBroadcastBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_POSITION = 4
+    VT_ROOM_ID = 4,
+    VT_SENDER_ID = 6,
+    VT_SENDER_NAME = 8,
+    VT_CONTENT = 10,
+    VT_TIMESTAMP = 12
   };
-  const NightProtocol::Vec2 *position() const {
-    return GetStruct<const NightProtocol::Vec2 *>(VT_POSITION);
+  uint32_t room_id() const {
+    return GetField<uint32_t>(VT_ROOM_ID, 0);
+  }
+  uint32_t sender_id() const {
+    return GetField<uint32_t>(VT_SENDER_ID, 0);
+  }
+  const ::flatbuffers::String *sender_name() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_SENDER_NAME);
+  }
+  const ::flatbuffers::String *content() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_CONTENT);
+  }
+  uint64_t timestamp() const {
+    return GetField<uint64_t>(VT_TIMESTAMP, 0);
   }
   template <bool B = false>
   bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<NightProtocol::Vec2>(verifier, VT_POSITION, 4) &&
+           VerifyField<uint32_t>(verifier, VT_ROOM_ID, 4) &&
+           VerifyField<uint32_t>(verifier, VT_SENDER_ID, 4) &&
+           VerifyOffset(verifier, VT_SENDER_NAME) &&
+           verifier.VerifyString(sender_name()) &&
+           VerifyOffset(verifier, VT_CONTENT) &&
+           verifier.VerifyString(content()) &&
+           VerifyField<uint64_t>(verifier, VT_TIMESTAMP, 8) &&
            verifier.EndTable();
   }
 };
 
-struct MoveRequestBuilder {
-  typedef MoveRequest Table;
+struct ChatBroadcastBuilder {
+  typedef ChatBroadcast Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_position(const NightProtocol::Vec2 *position) {
-    fbb_.AddStruct(MoveRequest::VT_POSITION, position);
+  void add_room_id(uint32_t room_id) {
+    fbb_.AddElement<uint32_t>(ChatBroadcast::VT_ROOM_ID, room_id, 0);
   }
-  explicit MoveRequestBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+  void add_sender_id(uint32_t sender_id) {
+    fbb_.AddElement<uint32_t>(ChatBroadcast::VT_SENDER_ID, sender_id, 0);
+  }
+  void add_sender_name(::flatbuffers::Offset<::flatbuffers::String> sender_name) {
+    fbb_.AddOffset(ChatBroadcast::VT_SENDER_NAME, sender_name);
+  }
+  void add_content(::flatbuffers::Offset<::flatbuffers::String> content) {
+    fbb_.AddOffset(ChatBroadcast::VT_CONTENT, content);
+  }
+  void add_timestamp(uint64_t timestamp) {
+    fbb_.AddElement<uint64_t>(ChatBroadcast::VT_TIMESTAMP, timestamp, 0);
+  }
+  explicit ChatBroadcastBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  ::flatbuffers::Offset<MoveRequest> Finish() {
+  ::flatbuffers::Offset<ChatBroadcast> Finish() {
     const auto end = fbb_.EndTable(start_);
-    auto o = ::flatbuffers::Offset<MoveRequest>(end);
+    auto o = ::flatbuffers::Offset<ChatBroadcast>(end);
     return o;
   }
 };
 
-inline ::flatbuffers::Offset<MoveRequest> CreateMoveRequest(
+inline ::flatbuffers::Offset<ChatBroadcast> CreateChatBroadcast(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    const NightProtocol::Vec2 *position = nullptr) {
-  MoveRequestBuilder builder_(_fbb);
-  builder_.add_position(position);
+    uint32_t room_id = 0,
+    uint32_t sender_id = 0,
+    ::flatbuffers::Offset<::flatbuffers::String> sender_name = 0,
+    ::flatbuffers::Offset<::flatbuffers::String> content = 0,
+    uint64_t timestamp = 0) {
+  ChatBroadcastBuilder builder_(_fbb);
+  builder_.add_timestamp(timestamp);
+  builder_.add_content(content);
+  builder_.add_sender_name(sender_name);
+  builder_.add_sender_id(sender_id);
+  builder_.add_room_id(room_id);
   return builder_.Finish();
 }
 
-struct StateSync FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
-  typedef StateSyncBuilder Builder;
-  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_SESSION_ID = 4,
-    VT_POSITION = 6
-  };
-  uint32_t session_id() const {
-    return GetField<uint32_t>(VT_SESSION_ID, 0);
-  }
-  const NightProtocol::Vec2 *position() const {
-    return GetStruct<const NightProtocol::Vec2 *>(VT_POSITION);
-  }
+inline ::flatbuffers::Offset<ChatBroadcast> CreateChatBroadcastDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint32_t room_id = 0,
+    uint32_t sender_id = 0,
+    const char *sender_name = nullptr,
+    const char *content = nullptr,
+    uint64_t timestamp = 0) {
+  auto sender_name__ = sender_name ? _fbb.CreateString(sender_name) : 0;
+  auto content__ = content ? _fbb.CreateString(content) : 0;
+  return NightProtocol::CreateChatBroadcast(
+      _fbb,
+      room_id,
+      sender_id,
+      sender_name__,
+      content__,
+      timestamp);
+}
+
+struct LeaveRoomRequest FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef LeaveRoomRequestBuilder Builder;
   template <bool B = false>
   bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint32_t>(verifier, VT_SESSION_ID, 4) &&
-           VerifyField<NightProtocol::Vec2>(verifier, VT_POSITION, 4) &&
            verifier.EndTable();
   }
 };
 
-struct StateSyncBuilder {
-  typedef StateSync Table;
+struct LeaveRoomRequestBuilder {
+  typedef LeaveRoomRequest Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_session_id(uint32_t session_id) {
-    fbb_.AddElement<uint32_t>(StateSync::VT_SESSION_ID, session_id, 0);
-  }
-  void add_position(const NightProtocol::Vec2 *position) {
-    fbb_.AddStruct(StateSync::VT_POSITION, position);
-  }
-  explicit StateSyncBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+  explicit LeaveRoomRequestBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  ::flatbuffers::Offset<StateSync> Finish() {
+  ::flatbuffers::Offset<LeaveRoomRequest> Finish() {
     const auto end = fbb_.EndTable(start_);
-    auto o = ::flatbuffers::Offset<StateSync>(end);
+    auto o = ::flatbuffers::Offset<LeaveRoomRequest>(end);
     return o;
   }
 };
 
-inline ::flatbuffers::Offset<StateSync> CreateStateSync(
-    ::flatbuffers::FlatBufferBuilder &_fbb,
-    uint32_t session_id = 0,
-    const NightProtocol::Vec2 *position = nullptr) {
-  StateSyncBuilder builder_(_fbb);
-  builder_.add_position(position);
-  builder_.add_session_id(session_id);
+inline ::flatbuffers::Offset<LeaveRoomRequest> CreateLeaveRoomRequest(
+    ::flatbuffers::FlatBufferBuilder &_fbb) {
+  LeaveRoomRequestBuilder builder_(_fbb);
   return builder_.Finish();
+}
+
+struct LeaveRoomResponse FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef LeaveRoomResponseBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_SUCCESS = 4,
+    VT_ERROR_CODE = 6
+  };
+  bool success() const {
+    return GetField<uint8_t>(VT_SUCCESS, 0) != 0;
+  }
+  NightProtocol::ErrorCode error_code() const {
+    return static_cast<NightProtocol::ErrorCode>(GetField<uint16_t>(VT_ERROR_CODE, 0));
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_SUCCESS, 1) &&
+           VerifyField<uint16_t>(verifier, VT_ERROR_CODE, 2) &&
+           verifier.EndTable();
+  }
+};
+
+struct LeaveRoomResponseBuilder {
+  typedef LeaveRoomResponse Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_success(bool success) {
+    fbb_.AddElement<uint8_t>(LeaveRoomResponse::VT_SUCCESS, static_cast<uint8_t>(success), 0);
+  }
+  void add_error_code(NightProtocol::ErrorCode error_code) {
+    fbb_.AddElement<uint16_t>(LeaveRoomResponse::VT_ERROR_CODE, static_cast<uint16_t>(error_code), 0);
+  }
+  explicit LeaveRoomResponseBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<LeaveRoomResponse> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<LeaveRoomResponse>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<LeaveRoomResponse> CreateLeaveRoomResponse(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool success = false,
+    NightProtocol::ErrorCode error_code = NightProtocol::ErrorCode::NONE) {
+  LeaveRoomResponseBuilder builder_(_fbb);
+  builder_.add_error_code(error_code);
+  builder_.add_success(success);
+  return builder_.Finish();
+}
+
+struct DisconnectRequest FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef DisconnectRequestBuilder Builder;
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           verifier.EndTable();
+  }
+};
+
+struct DisconnectRequestBuilder {
+  typedef DisconnectRequest Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  explicit DisconnectRequestBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<DisconnectRequest> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<DisconnectRequest>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<DisconnectRequest> CreateDisconnectRequest(
+    ::flatbuffers::FlatBufferBuilder &_fbb) {
+  DisconnectRequestBuilder builder_(_fbb);
+  return builder_.Finish();
+}
+
+struct DisconnectResponse FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef DisconnectResponseBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_SUCCESS = 4,
+    VT_ERROR_CODE = 6
+  };
+  bool success() const {
+    return GetField<uint8_t>(VT_SUCCESS, 0) != 0;
+  }
+  NightProtocol::ErrorCode error_code() const {
+    return static_cast<NightProtocol::ErrorCode>(GetField<uint16_t>(VT_ERROR_CODE, 0));
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_SUCCESS, 1) &&
+           VerifyField<uint16_t>(verifier, VT_ERROR_CODE, 2) &&
+           verifier.EndTable();
+  }
+};
+
+struct DisconnectResponseBuilder {
+  typedef DisconnectResponse Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_success(bool success) {
+    fbb_.AddElement<uint8_t>(DisconnectResponse::VT_SUCCESS, static_cast<uint8_t>(success), 0);
+  }
+  void add_error_code(NightProtocol::ErrorCode error_code) {
+    fbb_.AddElement<uint16_t>(DisconnectResponse::VT_ERROR_CODE, static_cast<uint16_t>(error_code), 0);
+  }
+  explicit DisconnectResponseBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<DisconnectResponse> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<DisconnectResponse>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<DisconnectResponse> CreateDisconnectResponse(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool success = false,
+    NightProtocol::ErrorCode error_code = NightProtocol::ErrorCode::NONE) {
+  DisconnectResponseBuilder builder_(_fbb);
+  builder_.add_error_code(error_code);
+  builder_.add_success(success);
+  return builder_.Finish();
+}
+
+struct UserJoinedEvent FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef UserJoinedEventBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_ROOM_ID = 4,
+    VT_USER = 6
+  };
+  uint32_t room_id() const {
+    return GetField<uint32_t>(VT_ROOM_ID, 0);
+  }
+  const NightProtocol::UserInfo *user() const {
+    return GetPointer<const NightProtocol::UserInfo *>(VT_USER);
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint32_t>(verifier, VT_ROOM_ID, 4) &&
+           VerifyOffset(verifier, VT_USER) &&
+           verifier.VerifyTable(user()) &&
+           verifier.EndTable();
+  }
+};
+
+struct UserJoinedEventBuilder {
+  typedef UserJoinedEvent Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_room_id(uint32_t room_id) {
+    fbb_.AddElement<uint32_t>(UserJoinedEvent::VT_ROOM_ID, room_id, 0);
+  }
+  void add_user(::flatbuffers::Offset<NightProtocol::UserInfo> user) {
+    fbb_.AddOffset(UserJoinedEvent::VT_USER, user);
+  }
+  explicit UserJoinedEventBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<UserJoinedEvent> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<UserJoinedEvent>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<UserJoinedEvent> CreateUserJoinedEvent(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint32_t room_id = 0,
+    ::flatbuffers::Offset<NightProtocol::UserInfo> user = 0) {
+  UserJoinedEventBuilder builder_(_fbb);
+  builder_.add_user(user);
+  builder_.add_room_id(room_id);
+  return builder_.Finish();
+}
+
+struct UserLeftEvent FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef UserLeftEventBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_ROOM_ID = 4,
+    VT_USER = 6
+  };
+  uint32_t room_id() const {
+    return GetField<uint32_t>(VT_ROOM_ID, 0);
+  }
+  const NightProtocol::UserInfo *user() const {
+    return GetPointer<const NightProtocol::UserInfo *>(VT_USER);
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint32_t>(verifier, VT_ROOM_ID, 4) &&
+           VerifyOffset(verifier, VT_USER) &&
+           verifier.VerifyTable(user()) &&
+           verifier.EndTable();
+  }
+};
+
+struct UserLeftEventBuilder {
+  typedef UserLeftEvent Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_room_id(uint32_t room_id) {
+    fbb_.AddElement<uint32_t>(UserLeftEvent::VT_ROOM_ID, room_id, 0);
+  }
+  void add_user(::flatbuffers::Offset<NightProtocol::UserInfo> user) {
+    fbb_.AddOffset(UserLeftEvent::VT_USER, user);
+  }
+  explicit UserLeftEventBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<UserLeftEvent> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<UserLeftEvent>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<UserLeftEvent> CreateUserLeftEvent(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint32_t room_id = 0,
+    ::flatbuffers::Offset<NightProtocol::UserInfo> user = 0) {
+  UserLeftEventBuilder builder_(_fbb);
+  builder_.add_user(user);
+  builder_.add_room_id(room_id);
+  return builder_.Finish();
+}
+
+struct SystemMessageEvent FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef SystemMessageEventBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_ROOM_ID = 4,
+    VT_CONTENT = 6
+  };
+  uint32_t room_id() const {
+    return GetField<uint32_t>(VT_ROOM_ID, 0);
+  }
+  const ::flatbuffers::String *content() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_CONTENT);
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint32_t>(verifier, VT_ROOM_ID, 4) &&
+           VerifyOffset(verifier, VT_CONTENT) &&
+           verifier.VerifyString(content()) &&
+           verifier.EndTable();
+  }
+};
+
+struct SystemMessageEventBuilder {
+  typedef SystemMessageEvent Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_room_id(uint32_t room_id) {
+    fbb_.AddElement<uint32_t>(SystemMessageEvent::VT_ROOM_ID, room_id, 0);
+  }
+  void add_content(::flatbuffers::Offset<::flatbuffers::String> content) {
+    fbb_.AddOffset(SystemMessageEvent::VT_CONTENT, content);
+  }
+  explicit SystemMessageEventBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<SystemMessageEvent> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<SystemMessageEvent>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<SystemMessageEvent> CreateSystemMessageEvent(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint32_t room_id = 0,
+    ::flatbuffers::Offset<::flatbuffers::String> content = 0) {
+  SystemMessageEventBuilder builder_(_fbb);
+  builder_.add_content(content);
+  builder_.add_room_id(room_id);
+  return builder_.Finish();
+}
+
+inline ::flatbuffers::Offset<SystemMessageEvent> CreateSystemMessageEventDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint32_t room_id = 0,
+    const char *content = nullptr) {
+  auto content__ = content ? _fbb.CreateString(content) : 0;
+  return NightProtocol::CreateSystemMessageEvent(
+      _fbb,
+      room_id,
+      content__);
 }
 
 struct Message FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef MessageBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_PAYLOAD_TYPE = 4,
-    VT_PAYLOAD = 6
+    VT_REQUEST_ID = 4,
+    VT_PAYLOAD_TYPE = 6,
+    VT_PAYLOAD = 8
   };
+  uint32_t request_id() const {
+    return GetField<uint32_t>(VT_REQUEST_ID, 0);
+  }
   NightProtocol::MessagePayload payload_type() const {
     return static_cast<NightProtocol::MessagePayload>(GetField<uint8_t>(VT_PAYLOAD_TYPE, 0));
   }
@@ -268,18 +1209,55 @@ struct Message FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     return GetPointer<const void *>(VT_PAYLOAD);
   }
   template<typename T> const T *payload_as() const;
-  const NightProtocol::ChatMessage *payload_as_ChatMessage() const {
-    return payload_type() == NightProtocol::MessagePayload::ChatMessage ? static_cast<const NightProtocol::ChatMessage *>(payload()) : nullptr;
+  const NightProtocol::LoginRequest *payload_as_LoginRequest() const {
+    return payload_type() == NightProtocol::MessagePayload::LoginRequest ? static_cast<const NightProtocol::LoginRequest *>(payload()) : nullptr;
   }
-  const NightProtocol::MoveRequest *payload_as_MoveRequest() const {
-    return payload_type() == NightProtocol::MessagePayload::MoveRequest ? static_cast<const NightProtocol::MoveRequest *>(payload()) : nullptr;
+  const NightProtocol::LoginResponse *payload_as_LoginResponse() const {
+    return payload_type() == NightProtocol::MessagePayload::LoginResponse ? static_cast<const NightProtocol::LoginResponse *>(payload()) : nullptr;
   }
-  const NightProtocol::StateSync *payload_as_StateSync() const {
-    return payload_type() == NightProtocol::MessagePayload::StateSync ? static_cast<const NightProtocol::StateSync *>(payload()) : nullptr;
+  const NightProtocol::RoomListRequest *payload_as_RoomListRequest() const {
+    return payload_type() == NightProtocol::MessagePayload::RoomListRequest ? static_cast<const NightProtocol::RoomListRequest *>(payload()) : nullptr;
+  }
+  const NightProtocol::RoomListResponse *payload_as_RoomListResponse() const {
+    return payload_type() == NightProtocol::MessagePayload::RoomListResponse ? static_cast<const NightProtocol::RoomListResponse *>(payload()) : nullptr;
+  }
+  const NightProtocol::JoinRoomRequest *payload_as_JoinRoomRequest() const {
+    return payload_type() == NightProtocol::MessagePayload::JoinRoomRequest ? static_cast<const NightProtocol::JoinRoomRequest *>(payload()) : nullptr;
+  }
+  const NightProtocol::JoinRoomResponse *payload_as_JoinRoomResponse() const {
+    return payload_type() == NightProtocol::MessagePayload::JoinRoomResponse ? static_cast<const NightProtocol::JoinRoomResponse *>(payload()) : nullptr;
+  }
+  const NightProtocol::ChatSendRequest *payload_as_ChatSendRequest() const {
+    return payload_type() == NightProtocol::MessagePayload::ChatSendRequest ? static_cast<const NightProtocol::ChatSendRequest *>(payload()) : nullptr;
+  }
+  const NightProtocol::ChatBroadcast *payload_as_ChatBroadcast() const {
+    return payload_type() == NightProtocol::MessagePayload::ChatBroadcast ? static_cast<const NightProtocol::ChatBroadcast *>(payload()) : nullptr;
+  }
+  const NightProtocol::LeaveRoomRequest *payload_as_LeaveRoomRequest() const {
+    return payload_type() == NightProtocol::MessagePayload::LeaveRoomRequest ? static_cast<const NightProtocol::LeaveRoomRequest *>(payload()) : nullptr;
+  }
+  const NightProtocol::LeaveRoomResponse *payload_as_LeaveRoomResponse() const {
+    return payload_type() == NightProtocol::MessagePayload::LeaveRoomResponse ? static_cast<const NightProtocol::LeaveRoomResponse *>(payload()) : nullptr;
+  }
+  const NightProtocol::DisconnectRequest *payload_as_DisconnectRequest() const {
+    return payload_type() == NightProtocol::MessagePayload::DisconnectRequest ? static_cast<const NightProtocol::DisconnectRequest *>(payload()) : nullptr;
+  }
+  const NightProtocol::DisconnectResponse *payload_as_DisconnectResponse() const {
+    return payload_type() == NightProtocol::MessagePayload::DisconnectResponse ? static_cast<const NightProtocol::DisconnectResponse *>(payload()) : nullptr;
+  }
+  const NightProtocol::UserJoinedEvent *payload_as_UserJoinedEvent() const {
+    return payload_type() == NightProtocol::MessagePayload::UserJoinedEvent ? static_cast<const NightProtocol::UserJoinedEvent *>(payload()) : nullptr;
+  }
+  const NightProtocol::UserLeftEvent *payload_as_UserLeftEvent() const {
+    return payload_type() == NightProtocol::MessagePayload::UserLeftEvent ? static_cast<const NightProtocol::UserLeftEvent *>(payload()) : nullptr;
+  }
+  const NightProtocol::SystemMessageEvent *payload_as_SystemMessageEvent() const {
+    return payload_type() == NightProtocol::MessagePayload::SystemMessageEvent ? static_cast<const NightProtocol::SystemMessageEvent *>(payload()) : nullptr;
   }
   template <bool B = false>
   bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
+           VerifyField<uint32_t>(verifier, VT_REQUEST_ID, 4) &&
            VerifyField<uint8_t>(verifier, VT_PAYLOAD_TYPE, 1) &&
            VerifyOffset(verifier, VT_PAYLOAD) &&
            VerifyMessagePayload(verifier, payload(), payload_type()) &&
@@ -287,22 +1265,73 @@ struct Message FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
 };
 
-template<> inline const NightProtocol::ChatMessage *Message::payload_as<NightProtocol::ChatMessage>() const {
-  return payload_as_ChatMessage();
+template<> inline const NightProtocol::LoginRequest *Message::payload_as<NightProtocol::LoginRequest>() const {
+  return payload_as_LoginRequest();
 }
 
-template<> inline const NightProtocol::MoveRequest *Message::payload_as<NightProtocol::MoveRequest>() const {
-  return payload_as_MoveRequest();
+template<> inline const NightProtocol::LoginResponse *Message::payload_as<NightProtocol::LoginResponse>() const {
+  return payload_as_LoginResponse();
 }
 
-template<> inline const NightProtocol::StateSync *Message::payload_as<NightProtocol::StateSync>() const {
-  return payload_as_StateSync();
+template<> inline const NightProtocol::RoomListRequest *Message::payload_as<NightProtocol::RoomListRequest>() const {
+  return payload_as_RoomListRequest();
+}
+
+template<> inline const NightProtocol::RoomListResponse *Message::payload_as<NightProtocol::RoomListResponse>() const {
+  return payload_as_RoomListResponse();
+}
+
+template<> inline const NightProtocol::JoinRoomRequest *Message::payload_as<NightProtocol::JoinRoomRequest>() const {
+  return payload_as_JoinRoomRequest();
+}
+
+template<> inline const NightProtocol::JoinRoomResponse *Message::payload_as<NightProtocol::JoinRoomResponse>() const {
+  return payload_as_JoinRoomResponse();
+}
+
+template<> inline const NightProtocol::ChatSendRequest *Message::payload_as<NightProtocol::ChatSendRequest>() const {
+  return payload_as_ChatSendRequest();
+}
+
+template<> inline const NightProtocol::ChatBroadcast *Message::payload_as<NightProtocol::ChatBroadcast>() const {
+  return payload_as_ChatBroadcast();
+}
+
+template<> inline const NightProtocol::LeaveRoomRequest *Message::payload_as<NightProtocol::LeaveRoomRequest>() const {
+  return payload_as_LeaveRoomRequest();
+}
+
+template<> inline const NightProtocol::LeaveRoomResponse *Message::payload_as<NightProtocol::LeaveRoomResponse>() const {
+  return payload_as_LeaveRoomResponse();
+}
+
+template<> inline const NightProtocol::DisconnectRequest *Message::payload_as<NightProtocol::DisconnectRequest>() const {
+  return payload_as_DisconnectRequest();
+}
+
+template<> inline const NightProtocol::DisconnectResponse *Message::payload_as<NightProtocol::DisconnectResponse>() const {
+  return payload_as_DisconnectResponse();
+}
+
+template<> inline const NightProtocol::UserJoinedEvent *Message::payload_as<NightProtocol::UserJoinedEvent>() const {
+  return payload_as_UserJoinedEvent();
+}
+
+template<> inline const NightProtocol::UserLeftEvent *Message::payload_as<NightProtocol::UserLeftEvent>() const {
+  return payload_as_UserLeftEvent();
+}
+
+template<> inline const NightProtocol::SystemMessageEvent *Message::payload_as<NightProtocol::SystemMessageEvent>() const {
+  return payload_as_SystemMessageEvent();
 }
 
 struct MessageBuilder {
   typedef Message Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
+  void add_request_id(uint32_t request_id) {
+    fbb_.AddElement<uint32_t>(Message::VT_REQUEST_ID, request_id, 0);
+  }
   void add_payload_type(NightProtocol::MessagePayload payload_type) {
     fbb_.AddElement<uint8_t>(Message::VT_PAYLOAD_TYPE, static_cast<uint8_t>(payload_type), 0);
   }
@@ -322,10 +1351,12 @@ struct MessageBuilder {
 
 inline ::flatbuffers::Offset<Message> CreateMessage(
     ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint32_t request_id = 0,
     NightProtocol::MessagePayload payload_type = NightProtocol::MessagePayload::NONE,
     ::flatbuffers::Offset<void> payload = 0) {
   MessageBuilder builder_(_fbb);
   builder_.add_payload(payload);
+  builder_.add_request_id(request_id);
   builder_.add_payload_type(payload_type);
   return builder_.Finish();
 }
@@ -336,16 +1367,64 @@ inline bool VerifyMessagePayload(::flatbuffers::VerifierTemplate<B> &verifier, c
     case MessagePayload::NONE: {
       return true;
     }
-    case MessagePayload::ChatMessage: {
-      auto ptr = reinterpret_cast<const NightProtocol::ChatMessage *>(obj);
+    case MessagePayload::LoginRequest: {
+      auto ptr = reinterpret_cast<const NightProtocol::LoginRequest *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case MessagePayload::MoveRequest: {
-      auto ptr = reinterpret_cast<const NightProtocol::MoveRequest *>(obj);
+    case MessagePayload::LoginResponse: {
+      auto ptr = reinterpret_cast<const NightProtocol::LoginResponse *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case MessagePayload::StateSync: {
-      auto ptr = reinterpret_cast<const NightProtocol::StateSync *>(obj);
+    case MessagePayload::RoomListRequest: {
+      auto ptr = reinterpret_cast<const NightProtocol::RoomListRequest *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case MessagePayload::RoomListResponse: {
+      auto ptr = reinterpret_cast<const NightProtocol::RoomListResponse *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case MessagePayload::JoinRoomRequest: {
+      auto ptr = reinterpret_cast<const NightProtocol::JoinRoomRequest *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case MessagePayload::JoinRoomResponse: {
+      auto ptr = reinterpret_cast<const NightProtocol::JoinRoomResponse *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case MessagePayload::ChatSendRequest: {
+      auto ptr = reinterpret_cast<const NightProtocol::ChatSendRequest *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case MessagePayload::ChatBroadcast: {
+      auto ptr = reinterpret_cast<const NightProtocol::ChatBroadcast *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case MessagePayload::LeaveRoomRequest: {
+      auto ptr = reinterpret_cast<const NightProtocol::LeaveRoomRequest *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case MessagePayload::LeaveRoomResponse: {
+      auto ptr = reinterpret_cast<const NightProtocol::LeaveRoomResponse *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case MessagePayload::DisconnectRequest: {
+      auto ptr = reinterpret_cast<const NightProtocol::DisconnectRequest *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case MessagePayload::DisconnectResponse: {
+      auto ptr = reinterpret_cast<const NightProtocol::DisconnectResponse *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case MessagePayload::UserJoinedEvent: {
+      auto ptr = reinterpret_cast<const NightProtocol::UserJoinedEvent *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case MessagePayload::UserLeftEvent: {
+      auto ptr = reinterpret_cast<const NightProtocol::UserLeftEvent *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case MessagePayload::SystemMessageEvent: {
+      auto ptr = reinterpret_cast<const NightProtocol::SystemMessageEvent *>(obj);
       return verifier.VerifyTable(ptr);
     }
     default: return true;
