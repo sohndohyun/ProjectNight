@@ -154,11 +154,6 @@ std::vector<ChatProtocolEvent> ChatProtocolClient::CreateMockEvents()
         },
     });
     events.push_back(ChatSystemMessageEvent { .room_id = 1001, .content = "Schema-based chat UI skeleton is ready." });
-    events.push_back(ChatMessageReceivedEvent { .room_id = 1001, .sender_name = "Alice", .content = "This area is reserved for chat broadcasts." });
-    events.push_back(ChatMessageReceivedEvent { .room_id = 1001, .sender_name = "Bob", .content = "Room list, user events and system messages can be mapped here." });
-    events.push_back(ChatUserJoinedEvent { .room_id = 1001, .display_name = "NightUser" });
-    events.push_back(ChatUserJoinedEvent { .room_id = 1001, .display_name = "Alice" });
-    events.push_back(ChatUserJoinedEvent { .room_id = 1001, .display_name = "Bob" });
     return events;
 }
 

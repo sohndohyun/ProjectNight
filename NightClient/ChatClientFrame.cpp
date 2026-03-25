@@ -158,7 +158,6 @@ void ChatClientFrame::LoadMockData()
     current_room_id_ = 0;
     current_room_label_->SetLabel("Current Room: -");
 
-    user_list_->Append("System");
     for (const auto& event : ChatProtocolClient::CreateMockEvents())
         ProcessProtocolEvent(event);
 
@@ -389,7 +388,6 @@ void ChatClientFrame::OnSendClicked(wxCommandEvent&)
         return;
 
     protocol_client_.SendChatRequest(text.ToStdString());
-    AppendChatMessage(Trimmed(display_name_ctrl_->GetValue()), text);
     message_input_ctrl_->Clear();
 }
 
