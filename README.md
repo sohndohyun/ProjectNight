@@ -1,14 +1,24 @@
 # ProjectNight
 
-Boost.Asio 기반 비동기 TCP Echo Server/Client 프로젝트.
+Boost.Asio 기반 비동기 TCP 채팅 서버/클라이언트 프로젝트.
 
 ## 프로젝트 구조
 
 | 디렉터리 | 설명 |
 |----------|------|
 | [**NightNetwork**](NightNetwork/README.md) | TCP 네트워크 정적 라이브러리 (구조, API, 사용 예시는 링크 참조) |
-| **NightServer** | NightNetwork를 사용하는 에코 서버 애플리케이션 |
-| **NightClient** | NightNetwork를 사용하는 에코 클라이언트 애플리케이션 |
+| [**schema**](schema/README.md) | FlatBuffers 기반 채팅 프로토콜 스키마 및 메시지 설명 |
+| **NightServer** | NightNetwork를 사용하는 채팅 서버 애플리케이션 |
+| **NightClient** | NightNetwork를 사용하는 채팅 클라이언트 애플리케이션 |
+
+## 주요 기능
+
+- TCP 기반 비동기 채팅 서버/클라이언트
+- 표시 이름(login) 요청 및 중복 이름 검사
+- 채팅방 목록 조회 및 방 입장
+- 방 사용자 입장/퇴장 이벤트 브로드캐스트
+- 같은 방 사용자 대상 채팅 메시지 브로드캐스트
+- 기본 채팅방 예시 제공: `Lobby`, `Dev`, `Chat`
 
 ## 사전 요구 사항
 
@@ -59,13 +69,13 @@ vcpkg\bootstrap-vcpkg.bat
 
 ## 빌드 및 실행
 
-프로젝트 루트에 포함된 bat 파일로 빌드부터 실행까지 한 번에 처리할 수 있습니다.
+프로젝트 루트의 `scripts/` 폴더에 포함된 bat 파일로 빌드부터 실행까지 한 번에 처리할 수 있습니다.
 Visual Studio 환경 변수 설정, CMake Configure, Build를 자동으로 수행합니다.
 
 ### 서버 실행
 
 ```bat
-run_server.bat
+scripts\run_server.bat
 ```
 
 서버가 **포트 12345**에서 시작됩니다.
@@ -74,31 +84,26 @@ run_server.bat
 
 ```bat
 :: 클라이언트 1개 실행
-run_client.bat
+scripts\run_client.bat
 
 :: 클라이언트 여러 개 실행 (예: 3개)
-run_client.bat 3
+scripts\run_client.bat 3
 ```
 
 클라이언트 수를 인자로 넘기면 해당 수만큼 별도 창에서 동시에 실행됩니다.
 
-## 와이어 프로토콜
+## 프로토콜 문서
 
-- NightNetwork의 전송 헤더는 고정 8바이트이다.
-- 헤더 구조: `[magic(2)][version(1)][flags(1)][payload_length_be(4)]`
-- `payload_length_be`는 big-endian(network byte order)으로 직렬화된다.
-- 현재 `magic`은 `0x4E4E` (`'NN'`), `version`은 `1`이다.
-- `flags`의 bit 0은 keepalive(`FLAG_KEEPALIVE`)로 사용한다.
-- keepalive 프레임은 `flags = FLAG_KEEPALIVE`, `payload_length_be = 0` 이다.
-- 일반 데이터 프레임은 payload 길이 1~2048바이트만 허용한다.
-- 이전 4바이트 length-prefix 헤더와의 하위 호환은 지원하지 않으므로, 서버와 클라이언트는 같은 프로토콜 버전으로 빌드해야 한다.
+채팅 프로토콜 구조와 메시지 타입 설명은 [`schema/README.md`](schema/README.md) 문서를 참조합니다.
 
 ## 테스트 방법
 
-1. `run_server.bat`를 실행하여 서버를 먼저 띄웁니다.
-2. 새 터미널(또는 별도 cmd 창)에서 `run_client.bat`를 실행합니다.
-3. 클라이언트 창에서 텍스트를 입력하면, 서버가 그대로 에코하여 돌려보냅니다.
-4. 여러 클라이언트를 동시에 테스트하려면 `run_client.bat 3`처럼 숫자를 지정합니다.
+1. `scripts/run_server.bat`를 실행하여 채팅 서버를 먼저 띄웁니다.
+2. 새 터미널(또는 별도 cmd 창)에서 `scripts/run_client.bat`를 실행합니다.
+3. 클라이언트에서 표시 이름을 입력하고 서버에 접속합니다.
+4. 방 목록을 새로고침한 뒤 원하는 채팅방에 입장합니다.
+5. 메시지를 입력하면 같은 방에 있는 다른 클라이언트들에게 브로드캐스트됩니다.
+6. 여러 클라이언트를 동시에 테스트하려면 `scripts/run_client.bat 3`처럼 숫자를 지정합니다.
 
 ## 수동 빌드
 

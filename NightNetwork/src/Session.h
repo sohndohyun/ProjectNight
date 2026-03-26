@@ -10,12 +10,12 @@
 #include <queue>
 #include <span>
 #include <vector>
-#include <boost/asio.hpp>
+#include <asio.hpp>
 
 namespace NightNetwork
 {
 
-using boost::asio::ip::tcp;
+using asio::ip::tcp;
 
 using ReceiveCallback = std::function<void(uint32_t, std::vector<uint8_t>)>;  ///< (session_id, payload) 수신 콜백
 using CloseCallback = std::function<void(uint32_t)>;                          ///< (session_id) 연결 종료 콜백
@@ -67,7 +67,7 @@ private:
 
     uint32_t id_;
     tcp::socket socket_;
-    boost::asio::strand<boost::asio::any_io_executor> strand_;
+    asio::strand<asio::any_io_executor> strand_;
     BufferPool& pool_;
     ReceiveCallback on_receive_;
     CloseCallback on_close_;
@@ -79,7 +79,7 @@ private:
     bool writing_ = false;
     bool closed_ = false;
 
-    boost::asio::steady_timer heartbeat_timer_;
+    asio::steady_timer heartbeat_timer_;
     std::chrono::steady_clock::time_point last_activity_;
 };
 

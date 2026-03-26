@@ -9,7 +9,7 @@ Session::Session(uint32_t id, tcp::socket socket, BufferPool& pool,
                  ReceiveCallback on_receive, CloseCallback on_close)
     : id_(id)
     , socket_(std::move(socket))
-    , strand_(boost::asio::make_strand(socket_.get_executor()))
+    , strand_(asio::make_strand(socket_.get_executor()))
     , pool_(pool)
     , on_receive_(std::move(on_receive))
     , on_close_(std::move(on_close))
@@ -34,7 +34,7 @@ void Session::send(std::span<const uint8_t> payload)
     if (frame.empty())
         return;
 
-    boost::asio::post(strand_,
+    asio::post(strand_,
         [self = shared_from_this(), frame = std::move(frame)]() mutable
         {
             self->enqueue_write(std::move(frame));
@@ -43,7 +43,7 @@ void Session::send(std::span<const uint8_t> payload)
 
 void Session::enqueue_raw_frame(std::vector<uint8_t> frame)
 {
-    boost::asio::post(strand_,
+    asio::post(strand_,
         [self = shared_from_this(), frame = std::move(frame)]() mutable
         {
             self->enqueue_write(std::move(frame));
@@ -52,7 +52,7 @@ void Session::enqueue_raw_frame(std::vector<uint8_t> frame)
 
 void Session::close()
 {
-    boost::asio::post(strand_,
+    asio::post(strand_,
         [self = shared_from_this()]()
         {
             self->handle_close();
@@ -77,11 +77,11 @@ void Session::enqueue_write(std::vector<uint8_t> frame)
 void Session::do_read_header()
 {
     auto self = shared_from_this();
-    boost::asio::async_read(
+    asio::async_read(
         socket_,
-        boost::asio::buffer(header_buf_, Protocol::HEADER_SIZE),
-        boost::asio::bind_executor(strand_,
-            [this, self](boost::system::error_code ec, std::size_t)
+        asio::buffer(header_buf_, Protocol::HEADER_SIZE),
+        asio::bind_executor(strand_,
+            [this, self](std::error_code ec, std::size_t)
             {
                 if (ec)
                 {
@@ -112,11 +112,11 @@ void Session::do_read_header()
 void Session::do_read_body()
 {
     auto self = shared_from_this();
-    boost::asio::async_read(
+    asio::async_read(
         socket_,
-        boost::asio::buffer(body_buf_),
-        boost::asio::bind_executor(strand_,
-            [this, self](boost::system::error_code ec, std::size_t)
+        asio::buffer(body_buf_),
+        asio::bind_executor(strand_,
+            [this, self](std::error_code ec, std::size_t)
             {
                 if (ec)
                 {
@@ -142,11 +142,11 @@ void Session::do_write()
     writing_ = true;
     auto self = shared_from_this();
     auto& front = write_queue_.front();
-    boost::asio::async_write(
+    asio::async_write(
         socket_,
-        boost::asio::buffer(front),
-        boost::asio::bind_executor(strand_,
-            [this, self](boost::system::error_code ec, std::size_t)
+        asio::buffer(front),
+        asio::bind_executor(strand_,
+            [this, self](std::error_code ec, std::size_t)
             {
                 pool_.release(std::move(write_queue_.front()));
                 write_queue_.pop();
@@ -163,8 +163,8 @@ void Session::start_heartbeat()
 {
     heartbeat_timer_.expires_after(Protocol::HEARTBEAT_INTERVAL);
     heartbeat_timer_.async_wait(
-        boost::asio::bind_executor(strand_,
-            [self = shared_from_this()](boost::system::error_code ec)
+        asio::bind_executor(strand_,
+            [self = shared_from_this()](std::error_code ec)
             {
                 if (ec)
                     return;
@@ -193,7 +193,7 @@ void Session::handle_close()
 
     closed_ = true;
     heartbeat_timer_.cancel();
-    boost::system::error_code ec;
+    std::error_code ec;
     socket_.shutdown(tcp::socket::shutdown_both, ec);
     socket_.close(ec);
     on_close_(id_);

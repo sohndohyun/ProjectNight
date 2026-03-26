@@ -3,6 +3,7 @@ setlocal
 
 set "SCRIPT_DIR=%~dp0"
 for %%I in ("%SCRIPT_DIR%..") do set "ROOT_DIR=%%~fI"
+set "SCHEMA_DIR=%ROOT_DIR%\schema"
 set "OUTPUT_DIR=%ROOT_DIR%\NightCommon\NightProtocol"
 
 set "FLATC="
@@ -33,23 +34,20 @@ if not defined FLATC (
     )
 )
 
+if not exist "%SCHEMA_DIR%\*.fbs" (
+    echo [ERROR] No .fbs files found in %SCHEMA_DIR%
+    pause
+    exit /b 1
+)
+
 if not exist "%OUTPUT_DIR%" mkdir "%OUTPUT_DIR%"
 
-set "HAS_SCHEMA=0"
-set "FAIL=0"
-
 echo Using flatc: %FLATC%
-for %%S in ("%SCRIPT_DIR%*.fbs") do (
-    set "HAS_SCHEMA=1"
+set "FAIL=0"
+for %%S in ("%SCHEMA_DIR%\*.fbs") do (
     echo Compiling: %%~nxS
     "%FLATC%" --cpp --scoped-enums -o "%OUTPUT_DIR%" "%%~fS"
     if errorlevel 1 set "FAIL=1"
-)
-
-if "%HAS_SCHEMA%" equ "0" (
-    echo [ERROR] No .fbs files found in %SCRIPT_DIR%
-    pause
-    exit /b 1
 )
 
 if "%FAIL%" equ "0" (

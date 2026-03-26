@@ -8,19 +8,19 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
-#include <boost/asio.hpp>
+#include <asio.hpp>
 #include <boost/lockfree/queue.hpp>
 
 namespace NightNetwork
 {
 
-using boost::asio::ip::tcp;
+using asio::ip::tcp;
 
 struct Server::Impl
 {
-    boost::asio::io_context io;
-    boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard;
-    boost::asio::strand<boost::asio::io_context::executor_type> server_strand;
+    asio::io_context io;
+    asio::executor_work_guard<asio::io_context::executor_type> work_guard;
+    asio::strand<asio::io_context::executor_type> server_strand;
     tcp::acceptor acceptor;
 
     BufferPool pool;
@@ -33,8 +33,8 @@ struct Server::Impl
     std::vector<std::jthread> io_threads;
 
     Impl()
-        : work_guard(boost::asio::make_work_guard(io))
-        , server_strand(boost::asio::make_strand(io))
+        : work_guard(asio::make_work_guard(io))
+        , server_strand(asio::make_strand(io))
         , acceptor(server_strand)
     {
     }
@@ -48,7 +48,7 @@ struct Server::Impl
 
     std::expected<void, std::string> listen(unsigned short port)
     {
-        boost::system::error_code ec;
+        std::error_code ec;
 
         acceptor.open(tcp::v4(), ec);
         if (ec)
@@ -62,7 +62,7 @@ struct Server::Impl
         if (ec)
             return std::unexpected("[에러] 바인드 실패: " + ec.message());
 
-        acceptor.listen(boost::asio::socket_base::max_listen_connections, ec);
+        acceptor.listen(asio::socket_base::max_listen_connections, ec);
         if (ec)
             return std::unexpected("[에러] 리슨 실패: " + ec.message());
 
@@ -95,8 +95,8 @@ struct Server::Impl
     void do_accept()
     {
         acceptor.async_accept(
-            boost::asio::bind_executor(server_strand,
-                [this](boost::system::error_code ec, tcp::socket socket)
+            asio::bind_executor(server_strand,
+                [this](std::error_code ec, tcp::socket socket)
                 {
                     if (!ec)
                     {
@@ -112,7 +112,7 @@ struct Server::Impl
                             {
                                 push_packet(Packet{
                                     PacketType::Disconnect, sid, {}});
-                                boost::asio::post(server_strand,
+                                asio::post(server_strand,
                                     [this, sid]()
                                     {
                                         sessions.erase(sid);
@@ -185,7 +185,7 @@ void Server::send(uint32_t session_id, std::span<const uint8_t> data)
     if (frame.empty())
         return;
 
-    boost::asio::post(impl_->server_strand,
+    asio::post(impl_->server_strand,
         [this, session_id, frame = std::move(frame)]() mutable
         {
             auto it = impl_->sessions.find(session_id);
@@ -205,7 +205,7 @@ void Server::broadcast(std::span<const uint8_t> data)
     if (frame_template.empty())
         return;
 
-    boost::asio::post(impl_->server_strand,
+    asio::post(impl_->server_strand,
         [this, frame_template = std::move(frame_template)]() mutable
         {
             for (auto& [id, session] : impl_->sessions)
@@ -219,7 +219,7 @@ void Server::broadcast(std::span<const uint8_t> data)
 
 void Server::disconnect(uint32_t session_id)
 {
-    boost::asio::post(impl_->server_strand,
+    asio::post(impl_->server_strand,
         [this, session_id]()
         {
             auto it = impl_->sessions.find(session_id);

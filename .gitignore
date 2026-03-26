@@ -1,6 +1,7 @@
 # Build output
 **/out/
 **/build/
+publish/
 
 # Visual Studio
 .vs/
@@ -57,3 +58,6 @@ Desktop.ini
 .idea/
 .vscode/
 .cursor/
+
+# Copilot
+.github/copilot-instructions.md

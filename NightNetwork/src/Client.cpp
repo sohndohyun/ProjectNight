@@ -9,18 +9,18 @@
 #include <cstring>
 #include <queue>
 #include <thread>
-#include <boost/asio.hpp>
+#include <asio.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
 
 namespace NightNetwork
 {
 
-using boost::asio::ip::tcp;
+using asio::ip::tcp;
 
 struct Client::Impl
 {
-    boost::asio::io_context io;
-    boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard;
+    asio::io_context io;
+    asio::executor_work_guard<asio::io_context::executor_type> work_guard;
     tcp::socket socket;
 
     BufferPool pool{32};
@@ -36,13 +36,13 @@ struct Client::Impl
     uint8_t header_buf[Protocol::HEADER_SIZE];
     std::vector<uint8_t> body_buf;
 
-    boost::asio::steady_timer heartbeat_timer;
+    asio::steady_timer heartbeat_timer;
     std::chrono::steady_clock::time_point last_activity;
 
     std::jthread io_thread;
 
     Impl()
-        : work_guard(boost::asio::make_work_guard(io))
+        : work_guard(asio::make_work_guard(io))
         , socket(io)
         , heartbeat_timer(io)
         , last_activity(std::chrono::steady_clock::now())
@@ -61,13 +61,13 @@ struct Client::Impl
         const std::string& host, unsigned short port)
     {
         tcp::resolver resolver(io);
-        boost::system::error_code ec;
+        std::error_code ec;
 
         auto endpoints = resolver.resolve(host, std::to_string(port), ec);
         if (ec)
             return std::unexpected("[에러] 주소 해석 실패: " + ec.message());
 
-        boost::asio::connect(socket, endpoints, ec);
+        asio::connect(socket, endpoints, ec);
         if (ec)
             return std::unexpected("[에러] 서버 연결 실패: " + ec.message());
 
@@ -91,17 +91,17 @@ struct Client::Impl
             return;
 
         heartbeat_timer.cancel();
-        boost::system::error_code ec;
+        std::error_code ec;
         socket.shutdown(tcp::socket::shutdown_both, ec);
         socket.close(ec);
     }
 
     void do_read_header()
     {
-        boost::asio::async_read(
+        asio::async_read(
             socket,
-            boost::asio::buffer(header_buf, Protocol::HEADER_SIZE),
-            [this](boost::system::error_code ec, std::size_t)
+            asio::buffer(header_buf, Protocol::HEADER_SIZE),
+            [this](std::error_code ec, std::size_t)
             {
                 if (ec)
                 {
@@ -131,10 +131,10 @@ struct Client::Impl
 
     void do_read_body()
     {
-        boost::asio::async_read(
+        asio::async_read(
             socket,
-            boost::asio::buffer(body_buf),
-            [this](boost::system::error_code ec, std::size_t)
+            asio::buffer(body_buf),
+            [this](std::error_code ec, std::size_t)
             {
                 if (ec)
                 {
@@ -178,10 +178,10 @@ struct Client::Impl
 
         writing = true;
         auto& front = write_queue.front();
-        boost::asio::async_write(
+        asio::async_write(
             socket,
-            boost::asio::buffer(front),
-            [this](boost::system::error_code ec, std::size_t)
+            asio::buffer(front),
+            [this](std::error_code ec, std::size_t)
             {
                 pool.release(std::move(write_queue.front()));
                 write_queue.pop();
@@ -198,7 +198,7 @@ struct Client::Impl
     {
         heartbeat_timer.expires_after(Protocol::HEARTBEAT_INTERVAL);
         heartbeat_timer.async_wait(
-            [this](boost::system::error_code ec)
+            [this](std::error_code ec)
             {
                 if (ec)
                     return;
@@ -278,7 +278,7 @@ void Client::send(std::span<const uint8_t> data)
     if (frame.empty())
         return;
 
-    boost::asio::post(impl_->io,
+    asio::post(impl_->io,
         [this, frame = std::move(frame)]() mutable
         {
             impl_->enqueue_frame(std::move(frame));
