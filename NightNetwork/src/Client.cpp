@@ -7,6 +7,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstring>
+#include <future>
 #include <queue>
 #include <thread>
 #include <asio.hpp>
@@ -17,6 +18,11 @@ namespace NightNetwork
 
 using asio::ip::tcp;
 
+namespace
+{
+constexpr std::size_t MAX_PENDING_WRITE_FRAMES = 1024;
+}
+
 struct Client::Impl
 {
     asio::io_context io;
@@ -26,9 +32,11 @@ struct Client::Impl
     BufferPool pool{32};
 
     std::atomic<bool> connected = false;
+    std::atomic<bool> shutting_down = false;
 
     boost::lockfree::spsc_queue<std::vector<uint8_t>*,
         boost::lockfree::capacity<4096>> receive_queue;
+    std::atomic_uint64_t dropped_packets = 0;
 
     std::queue<std::vector<uint8_t>> write_queue;
     bool writing = false;
@@ -52,6 +60,8 @@ struct Client::Impl
 
     ~Impl()
     {
+        shutdown();
+
         std::vector<uint8_t>* ptr = nullptr;
         while (receive_queue.pop(ptr))
             delete ptr;
@@ -70,6 +80,10 @@ struct Client::Impl
         asio::connect(socket, endpoints, ec);
         if (ec)
             return std::unexpected("[에러] 서버 연결 실패: " + ec.message());
+
+        socket.set_option(tcp::no_delay(true), ec);
+        if (ec)
+            return std::unexpected("[에러] TCP_NODELAY 설정 실패: " + ec.message());
 
         connected.store(true, std::memory_order_relaxed);
         return {};
@@ -90,10 +104,46 @@ struct Client::Impl
         if (!connected.exchange(false, std::memory_order_relaxed))
             return;
 
+        close_socket();
+    }
+
+    void close_socket()
+    {
         heartbeat_timer.cancel();
         std::error_code ec;
         socket.shutdown(tcp::socket::shutdown_both, ec);
         socket.close(ec);
+    }
+
+    void shutdown()
+    {
+        if (shutting_down.exchange(true, std::memory_order_acq_rel))
+            return;
+
+        if (!io.stopped() && io_thread.joinable())
+        {
+            auto done = std::make_shared<std::promise<void>>();
+            auto future = done->get_future();
+            asio::post(io,
+                [this, done]()
+                {
+                    connected.store(false, std::memory_order_relaxed);
+                    close_socket();
+                    done->set_value();
+                });
+            future.wait();
+        }
+        else
+        {
+            connected.store(false, std::memory_order_relaxed);
+            close_socket();
+        }
+
+        work_guard.reset();
+        io.stop();
+
+        if (io_thread.joinable())
+            io_thread.join();
     }
 
     void do_read_header()
@@ -103,7 +153,7 @@ struct Client::Impl
             asio::buffer(header_buf, Protocol::HEADER_SIZE),
             [this](std::error_code ec, std::size_t)
             {
-                if (ec)
+                if (ec || shutting_down.load(std::memory_order_acquire))
                 {
                     handle_disconnect();
                     return;
@@ -136,7 +186,7 @@ struct Client::Impl
             asio::buffer(body_buf),
             [this](std::error_code ec, std::size_t)
             {
-                if (ec)
+                if (ec || shutting_down.load(std::memory_order_acquire))
                 {
                     handle_disconnect();
                     return;
@@ -146,8 +196,17 @@ struct Client::Impl
                     auto copy = pool.acquire(body_buf.size());
                     std::memcpy(copy.data(), body_buf.data(), body_buf.size());
                     auto packet = new std::vector<uint8_t>(std::move(copy));
-                    if (!receive_queue.push(packet))
+                    if (shutting_down.load(std::memory_order_acquire))
+                    {
                         delete packet;
+                        return;
+                    }
+
+                    if (!receive_queue.push(packet))
+                    {
+                        delete packet;
+                        dropped_packets.fetch_add(1, std::memory_order_relaxed);
+                    }
                 }
                 do_read_header();
             });
@@ -155,17 +214,23 @@ struct Client::Impl
 
     void enqueue_frame(std::vector<uint8_t> frame)
     {
-        if (!connected.load(std::memory_order_relaxed))
+        if (shutting_down.load(std::memory_order_acquire)
+            || !connected.load(std::memory_order_relaxed))
         {
             pool.release(std::move(frame));
             return;
         }
 
-        Detail::enqueue_frame(write_queue, writing, std::move(frame),
+        if (!Detail::enqueue_frame(write_queue, writing, std::move(frame),
             [this]()
             {
                 do_write();
-            });
+            },
+            MAX_PENDING_WRITE_FRAMES))
+        {
+            pool.release(std::move(frame));
+            handle_disconnect();
+        }
     }
 
     void do_write()
@@ -185,7 +250,7 @@ struct Client::Impl
             {
                 pool.release(std::move(write_queue.front()));
                 write_queue.pop();
-                if (ec)
+                if (ec || shutting_down.load(std::memory_order_acquire))
                 {
                     handle_disconnect();
                     return;
@@ -242,10 +307,7 @@ Client::Client(std::unique_ptr<Impl> impl)
 Client::~Client()
 {
     if (impl_)
-    {
-        impl_->work_guard.reset();
-        impl_->io.stop();
-    }
+        impl_->shutdown();
 }
 
 Client::Client(Client&&) noexcept = default;
@@ -266,12 +328,20 @@ std::optional<std::vector<uint8_t>> Client::poll_packet()
     return data;
 }
 
+uint64_t Client::dropped_packet_count() const
+{
+    return impl_->dropped_packets.load(std::memory_order_relaxed);
+}
+
 void Client::send(std::span<const uint8_t> data)
 {
     if (data.empty() || data.size() > Protocol::MAX_PAYLOAD_SIZE)
         return;
 
     if (!impl_->connected.load(std::memory_order_relaxed))
+        return;
+
+    if (impl_->shutting_down.load(std::memory_order_acquire))
         return;
 
     auto frame = Detail::build_data_frame(impl_->pool, data);
@@ -281,6 +351,12 @@ void Client::send(std::span<const uint8_t> data)
     asio::post(impl_->io,
         [this, frame = std::move(frame)]() mutable
         {
+            if (impl_->shutting_down.load(std::memory_order_acquire))
+            {
+                impl_->pool.release(std::move(frame));
+                return;
+            }
+
             impl_->enqueue_frame(std::move(frame));
         });
 }

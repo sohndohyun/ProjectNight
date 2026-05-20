@@ -8,8 +8,7 @@ FlatBuffers 기반 채팅 프로토콜 스키마 디렉터리.
 ```
 schema/
 ├── README.md              # 프로토콜 설명 문서
-├── messages.fbs           # FlatBuffers 스키마 정의
-└── compile.bat            # C++ 코드 생성 스크립트
+└── messages.fbs           # FlatBuffers 스키마 정의
 ```
 
 생성된 헤더 출력 경로:
@@ -120,8 +119,16 @@ union MessagePayload {
 
 ## 스키마 코드 생성
 
+일반 빌드에서는 CMake의 `NightProtocolGenerated` 타겟이 생성 헤더를 자동으로 갱신한다.
+
 ```bat
-schema\compile.bat
+cmake --build out/build/x64-debug --target NightProtocolGenerated
+```
+
+수동으로 실행해야 하는 경우 프로젝트 루트에서 다음 스크립트를 사용할 수 있다.
+
+```bat
+scripts\compile.bat
 ```
 
 `schema/*.fbs`를 컴파일하여 `NightCommon/NightProtocol/` 아래에 생성 파일을 출력한다.

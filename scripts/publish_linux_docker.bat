@@ -6,13 +6,13 @@ set "SCRIPT_DIR=%~dp0"
 for %%I in ("%SCRIPT_DIR%..") do set "ROOT_DIR=%%~fI"
 set "IMAGE=ubuntu:24.04"
 
-echo [ProjectNight] Docker Linux Release ºôµå
+echo [ProjectNight] Docker Linux Release ë¹Œë“œ
 echo.
 
 where docker.exe >nul 2>&1
 if errorlevel 1 (
-    echo [¿¡·¯] docker¸¦ Ã£À» ¼ö ¾ø½À´Ï´Ù.
-    echo        Docker Desktop°ú Linux container È¯°æÀÌ ÇÊ¿äÇÕ´Ï´Ù.
+    echo [ì—ëŸ¬] dockerë¥¼ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤.
+    echo        Docker Desktopê³¼ Linux container í™˜ê²½ì´ í•„ìš”í•©ë‹ˆë‹¤.
     pause
     exit /b 1
 )
@@ -21,24 +21,24 @@ pushd "%ROOT_DIR%"
 
 if not exist "publish" mkdir "publish"
 if exist "publish\linux-release" (
-    echo [Á¤¸®] ±âÁ¸ publish\linux-release »èÁ¦
+    echo [ì •ë¦¬] ê¸°ì¡´ publish\linux-release ì‚­ì œ
     rmdir /s /q "publish\linux-release"
 )
 
-echo [Docker] ÄÁÅ×ÀÌ³Ê¿¡¼­ ÀÇÁ¸¼º ¼³Ä¡, Configure, Build, Publish¸¦ ¼öÇàÇÕ´Ï´Ù...
+echo [Docker] ì»¨í…Œì´ë„ˆì—ì„œ ì˜ì¡´ì„± ì„¤ì¹˜, Configure, Build, Publishë¥¼ ìˆ˜í–‰í•©ë‹ˆë‹¤...
 docker run --rm ^
     -v "%ROOT_DIR%:/workspace" ^
     -w /workspace ^
     "%IMAGE%" ^
     bash -lc "set -euo pipefail && export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -y build-essential cmake ninja-build pkg-config curl zip unzip tar git ca-certificates autoconf automake libtool xorg-dev libgtk-3-dev libglu1-mesa-dev libnotify-dev libsecret-1-dev && ./vcpkg/bootstrap-vcpkg.sh -disableMetrics && cmake -S . -B out/build/linux-release -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=/workspace/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-linux && cmake --build out/build/linux-release --config Release && mkdir -p publish/linux-release/NightServer publish/linux-release/NightClient && cp -f out/build/linux-release/NightServer/NightServer publish/linux-release/NightServer/ && cp -f out/build/linux-release/NightClient/NightClient publish/linux-release/NightClient/"
 if errorlevel 1 (
-    echo [¿¡·¯] Docker Linux Release ºôµå ½ÇÆĞ
+    echo [ì—ëŸ¬] Docker Linux Release ë¹Œë“œ ì‹¤íŒ¨
     popd
     pause
     exit /b 1
 )
 
 echo.
-echo [¿Ï·á] publish\linux-release
+echo [ì™„ë£Œ] publish\linux-release
 popd
 pause

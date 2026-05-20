@@ -1,8 +1,6 @@
 #include "ChatProtocolClient.h"
 
-#include <NightProtocol/messages_generated.h>
-
-#include <flatbuffers/flatbuffers.h>
+#include <NightProtocol/ProtocolUtil.h>
 
 #include <span>
 #include <utility>
@@ -10,28 +8,13 @@
 namespace
 {
 
-std::string ToUtf8(const char* value)
-{
-    return value ? std::string(value) : std::string {};
-}
-
-std::string ToUtf8(const flatbuffers::String* value)
-{
-    return value ? std::string(value->c_str()) : std::string {};
-}
-
 ChatRoomInfo ToChatRoomInfo(const NightProtocol::RoomInfo& room)
 {
     return ChatRoomInfo {
         .room_id = room.room_id(),
-        .room_name = ToUtf8(room.room_name()),
+        .room_name = NightProtocol::ToUtf8(room.room_name()),
         .user_count = room.user_count(),
     };
-}
-
-std::string ToErrorString(NightProtocol::ErrorCode error_code)
-{
-    return ToUtf8(NightProtocol::EnumNameErrorCode(error_code));
 }
 
 } // namespace
@@ -69,7 +52,8 @@ void ChatProtocolClient::SendLoginRequest(std::string_view display_name)
         return;
 
     flatbuffers::FlatBufferBuilder builder;
-    auto payload = NightProtocol::CreateLoginRequestDirect(builder, display_name.data());
+    auto display_name_value = NightProtocol::CreateString(builder, display_name);
+    auto payload = NightProtocol::CreateLoginRequest(builder, display_name_value);
     auto message = NightProtocol::CreateMessage(
         builder,
         NextRequestId(),
@@ -117,7 +101,8 @@ void ChatProtocolClient::SendChatRequest(std::string_view text)
         return;
 
     flatbuffers::FlatBufferBuilder builder;
-    auto payload = NightProtocol::CreateChatSendRequestDirect(builder, text.data());
+    auto content = NightProtocol::CreateString(builder, text);
+    auto payload = NightProtocol::CreateChatSendRequest(builder, content);
     auto message = NightProtocol::CreateMessage(
         builder,
         NextRequestId(),
@@ -176,16 +161,12 @@ std::vector<ChatProtocolEvent> ChatProtocolClient::DecodePacket(const std::vecto
     if (data.empty())
         return events;
 
-    flatbuffers::Verifier verifier(data.data(), data.size());
-    if (!NightProtocol::VerifyMessageBuffer(verifier))
+    const auto* message = NightProtocol::VerifiedMessage(data);
+    if (!message)
     {
         events.push_back(ChatProtocolErrorEvent { .message = "Received data does not match the Message schema." });
         return events;
     }
-
-    const auto* message = flatbuffers::GetRoot<NightProtocol::Message>(data.data());
-    if (!message)
-        return events;
 
     switch (message->payload_type())
     {
@@ -199,13 +180,13 @@ std::vector<ChatProtocolEvent> ChatProtocolClient::DecodePacket(const std::vecto
         {
             const auto* user = response->user();
             events.push_back(ChatLoginSucceededEvent {
-                .display_name = user ? ToUtf8(user->display_name()) : std::string {},
+                .display_name = user ? NightProtocol::ToUtf8(user->display_name()) : std::string {},
             });
         }
         else
         {
             events.push_back(ChatLoginFailedEvent {
-                .error_message = ToErrorString(response->error_code()),
+                .error_message = NightProtocol::ToErrorString(response->error_code()),
             });
         }
         break;
@@ -246,7 +227,7 @@ std::vector<ChatProtocolEvent> ChatProtocolClient::DecodePacket(const std::vecto
         else
         {
             events.push_back(ChatJoinRoomFailedEvent {
-                .error_message = ToErrorString(response->error_code()),
+                .error_message = NightProtocol::ToErrorString(response->error_code()),
             });
         }
         break;
@@ -260,8 +241,8 @@ std::vector<ChatProtocolEvent> ChatProtocolClient::DecodePacket(const std::vecto
 
         events.push_back(ChatMessageReceivedEvent {
             .room_id = broadcast->room_id(),
-            .sender_name = ToUtf8(broadcast->sender_name()),
-            .content = ToUtf8(broadcast->content()),
+            .sender_name = NightProtocol::ToUtf8(broadcast->sender_name()),
+            .content = NightProtocol::ToUtf8(broadcast->content()),
         });
         break;
     }
@@ -274,7 +255,7 @@ std::vector<ChatProtocolEvent> ChatProtocolClient::DecodePacket(const std::vecto
 
         events.push_back(ChatUserJoinedEvent {
             .room_id = event->room_id(),
-            .display_name = ToUtf8(event->user()->display_name()),
+            .display_name = NightProtocol::ToUtf8(event->user()->display_name()),
         });
         break;
     }
@@ -287,7 +268,7 @@ std::vector<ChatProtocolEvent> ChatProtocolClient::DecodePacket(const std::vecto
 
         events.push_back(ChatUserLeftEvent {
             .room_id = event->room_id(),
-            .display_name = ToUtf8(event->user()->display_name()),
+            .display_name = NightProtocol::ToUtf8(event->user()->display_name()),
         });
         break;
     }
@@ -300,7 +281,7 @@ std::vector<ChatProtocolEvent> ChatProtocolClient::DecodePacket(const std::vecto
 
         events.push_back(ChatSystemMessageEvent {
             .room_id = event->room_id(),
-            .content = ToUtf8(event->content()),
+            .content = NightProtocol::ToUtf8(event->content()),
         });
         break;
     }

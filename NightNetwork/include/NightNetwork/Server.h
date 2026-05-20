@@ -2,6 +2,7 @@
 
 #include "Packet.h"
 
+#include <cstdint>
 #include <expected>
 #include <memory>
 #include <optional>
@@ -46,6 +47,12 @@ public:
     /// nullopt이 나올 때까지 반복 호출해야 한다.
     /// </summary>
     std::optional<Packet> poll_packet();
+
+    /// <summary>
+    /// 내부 수신 큐가 가득 차서 상위 계층에 전달하지 못한 패킷 수를 반환한다.
+    /// 운영 코드에서는 이 값이 증가하면 tick 처리량 또는 큐 용량을 조정해야 한다.
+    /// </summary>
+    uint64_t dropped_packet_count() const;
 
     /// <summary>
     /// 특정 세션에 페이로드를 전송한다. 내부 wire 헤더 프레임을 빌드한다.

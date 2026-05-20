@@ -15,3 +15,6 @@ add_subdirectory(NightCommon)
 add_subdirectory(NightNetwork)
 add_subdirectory(NightServer)
 add_subdirectory(NightClient)
+
+enable_testing()
+add_subdirectory(tests)

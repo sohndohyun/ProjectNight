@@ -5,6 +5,9 @@
 #include "TransportDetail.h"
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <future>
 #include <thread>
 #include <unordered_map>
 #include <vector>
@@ -29,6 +32,8 @@ struct Server::Impl
     std::unordered_map<uint32_t, std::shared_ptr<Session>> sessions;
 
     boost::lockfree::queue<Packet*, boost::lockfree::capacity<8192>> packet_queue;
+    std::atomic_uint64_t dropped_packets = 0;
+    std::atomic<bool> shutting_down = false;
 
     std::vector<std::jthread> io_threads;
 
@@ -41,6 +46,8 @@ struct Server::Impl
 
     ~Impl()
     {
+        shutdown();
+
         Packet* ptr = nullptr;
         while (packet_queue.pop(ptr))
             delete ptr;
@@ -71,12 +78,54 @@ struct Server::Impl
 
     bool push_packet(Packet pkt)
     {
+        if (shutting_down.load(std::memory_order_acquire))
+            return false;
+
         auto packet = new Packet(std::move(pkt));
         if (packet_queue.push(packet))
             return true;
 
         delete packet;
+        dropped_packets.fetch_add(1, std::memory_order_relaxed);
         return false;
+    }
+
+    void shutdown()
+    {
+        if (shutting_down.exchange(true, std::memory_order_acq_rel))
+            return;
+
+        if (!io.stopped() && !io_threads.empty())
+        {
+            auto done = std::make_shared<std::promise<void>>();
+            auto future = done->get_future();
+            asio::post(server_strand,
+                [this, done]()
+                {
+                    std::error_code ec;
+                    acceptor.cancel(ec);
+                    acceptor.close(ec);
+                    for (auto& [id, session] : sessions)
+                        session->close();
+                    done->set_value();
+                });
+            future.wait();
+        }
+        else
+        {
+            std::error_code ec;
+            acceptor.cancel(ec);
+            acceptor.close(ec);
+        }
+
+        work_guard.reset();
+        io.stop();
+
+        for (auto& thread : io_threads)
+        {
+            if (thread.joinable())
+                thread.join();
+        }
     }
 
     void start_threads()
@@ -98,8 +147,11 @@ struct Server::Impl
             asio::bind_executor(server_strand,
                 [this](std::error_code ec, tcp::socket socket)
                 {
-                    if (!ec)
+                    if (!ec && !shutting_down.load(std::memory_order_acquire))
                     {
+                        std::error_code option_ec;
+                        socket.set_option(tcp::no_delay(true), option_ec);
+
                         uint32_t id = next_id++;
                         auto session = std::make_shared<Session>(
                             id, std::move(socket), pool,
@@ -126,7 +178,8 @@ struct Server::Impl
                         }
                     }
 
-                    do_accept();
+                    if (!shutting_down.load(std::memory_order_acquire))
+                        do_accept();
                 }));
     }
 };
@@ -152,10 +205,7 @@ Server::Server(std::unique_ptr<Impl> impl)
 Server::~Server()
 {
     if (impl_)
-    {
-        impl_->work_guard.reset();
-        impl_->io.stop();
-    }
+        impl_->shutdown();
 }
 
 Server::Server(Server&&) noexcept = default;
@@ -176,9 +226,17 @@ std::optional<Packet> Server::poll_packet()
     return pkt;
 }
 
+uint64_t Server::dropped_packet_count() const
+{
+    return impl_->dropped_packets.load(std::memory_order_relaxed);
+}
+
 void Server::send(uint32_t session_id, std::span<const uint8_t> data)
 {
     if (data.empty() || data.size() > Protocol::MAX_PAYLOAD_SIZE)
+        return;
+
+    if (impl_->shutting_down.load(std::memory_order_acquire))
         return;
 
     auto frame = Detail::build_data_frame(impl_->pool, data);
@@ -188,6 +246,12 @@ void Server::send(uint32_t session_id, std::span<const uint8_t> data)
     asio::post(impl_->server_strand,
         [this, session_id, frame = std::move(frame)]() mutable
         {
+            if (impl_->shutting_down.load(std::memory_order_acquire))
+            {
+                impl_->pool.release(std::move(frame));
+                return;
+            }
+
             auto it = impl_->sessions.find(session_id);
             if (it != impl_->sessions.end())
                 it->second->enqueue_raw_frame(std::move(frame));
@@ -201,6 +265,9 @@ void Server::broadcast(std::span<const uint8_t> data)
     if (data.empty() || data.size() > Protocol::MAX_PAYLOAD_SIZE)
         return;
 
+    if (impl_->shutting_down.load(std::memory_order_acquire))
+        return;
+
     auto frame_template = Detail::build_data_frame(impl_->pool, data);
     if (frame_template.empty())
         return;
@@ -208,6 +275,12 @@ void Server::broadcast(std::span<const uint8_t> data)
     asio::post(impl_->server_strand,
         [this, frame_template = std::move(frame_template)]() mutable
         {
+            if (impl_->shutting_down.load(std::memory_order_acquire))
+            {
+                impl_->pool.release(std::move(frame_template));
+                return;
+            }
+
             for (auto& [id, session] : impl_->sessions)
             {
                 auto frame = Detail::clone_frame(impl_->pool, frame_template);
@@ -219,9 +292,15 @@ void Server::broadcast(std::span<const uint8_t> data)
 
 void Server::disconnect(uint32_t session_id)
 {
+    if (impl_->shutting_down.load(std::memory_order_acquire))
+        return;
+
     asio::post(impl_->server_strand,
         [this, session_id]()
         {
+            if (impl_->shutting_down.load(std::memory_order_acquire))
+                return;
+
             auto it = impl_->sessions.find(session_id);
             if (it != impl_->sessions.end())
                 it->second->close();

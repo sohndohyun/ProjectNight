@@ -1,6 +1,6 @@
 # NightNetwork
 
-Boost.Asio 기반 비동기 TCP 네트워크 라이브러리.
+Asio 기반 비동기 TCP 네트워크 라이브러리.
 바이트 운반만 담당하며, 메시지 타입 구분이나 직렬화는 상위 레이어(게임 로직)에 위임한다.
 
 ## 특징
@@ -75,6 +75,8 @@ NightNetwork/
 - **Server**: `std::thread::hardware_concurrency()` 개수의 I/O 스레드 운용
 - **Client**: 단일 I/O 스레드 (소켓 1개이므로 충분)
 - `executor_work_guard`로 `io_context::run()` 유지, 소멸자에서 자동 정리
+- public API는 소유 객체가 살아 있는 동안 게임 스레드 한 곳에서 호출하는 것을 기본 계약으로 한다.
+- `send()`, `broadcast()`, `disconnect()`는 I/O 스레드로 작업을 넘기지만, 객체 소멸과 동시에 다른 스레드에서 호출하는 패턴은 지원하지 않는다.
 
 ### 패킷 큐
 
@@ -152,6 +154,9 @@ public:
     // 수신 큐에서 패킷을 하나 꺼냄. 비었으면 nullopt 반환.
     std::optional<Packet> poll_packet();
 
+    // 수신 큐 overflow로 버려진 패킷 수 조회
+    uint64_t dropped_packet_count() const;
+
     // 특정 세션에 페이로드 전송 (최대 2048 바이트)
     void send(uint32_t session_id, std::span<const uint8_t> data);
 
@@ -183,6 +188,9 @@ public:
 
     // 수신 큐에서 페이로드 꺼냄 (wire 헤더 제거된 순수 데이터). 비었으면 nullopt.
     std::optional<std::vector<uint8_t>> poll_packet();
+
+    // 수신 큐 overflow로 버려진 패킷 수 조회
+    uint64_t dropped_packet_count() const;
 
     // 서버에 페이로드 전송 (최대 2048 바이트)
     void send(std::span<const uint8_t> data);
@@ -398,7 +406,7 @@ target_link_libraries(MyGameServer PRIVATE NightNetwork)
 ```json
 {
     "dependencies": [
-        "boost-asio",
+        "asio",
         "boost-lockfree"
     ]
 }
@@ -413,6 +421,7 @@ target_link_libraries(MyGameServer PRIVATE NightNetwork)
 | `create(port)` | `std::expected<Server, std::string>` | 서버 생성 및 리슨 시작 |
 | `update()` | `void` | 매 틱 호출 (예약용) |
 | `poll_packet()` | `std::optional<Packet>` | 수신 큐에서 패킷 하나 꺼냄 |
+| `dropped_packet_count()` | `uint64_t` | 수신 큐 overflow로 버려진 패킷 수 조회 |
 | `send(session_id, data)` | `void` | 특정 세션에 전송 |
 | `broadcast(data)` | `void` | 전체 세션에 전송 |
 | `disconnect(session_id)` | `void` | 특정 세션 강제 종료 |
@@ -424,12 +433,14 @@ target_link_libraries(MyGameServer PRIVATE NightNetwork)
 | `create(host, port)` | `std::expected<Client, std::string>` | 서버에 연결 |
 | `update()` | `void` | 매 틱 호출 (예약용) |
 | `poll_packet()` | `std::optional<std::vector<uint8_t>>` | 수신 큐에서 데이터 꺼냄 |
+| `dropped_packet_count()` | `uint64_t` | 수신 큐 overflow로 버려진 패킷 수 조회 |
 | `send(data)` | `void` | 서버에 전송 |
 | `is_connected()` | `bool` | 연결 상태 확인 |
 
 ## 주의사항
 
 - `poll_packet()`은 `nullopt`이 반환될 때까지 반복 호출해야 한다. 한 틱에 여러 패킷이 쌓일 수 있다.
+- `dropped_packet_count()`가 증가하면 게임 루프 처리량이 부족하거나 큐 용량이 부족한 상태다.
 - `send()` / `broadcast()`에서 `MAX_PAYLOAD_SIZE`(2048 바이트)를 초과하는 데이터는 무시된다.
 - `disconnect()` 후 해당 세션의 `Disconnect` 이벤트가 `poll_packet()`으로 전달된다.
 - 이미 종료된 세션에 대한 `send()` / `disconnect()`는 안전하게 무시된다.

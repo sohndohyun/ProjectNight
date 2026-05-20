@@ -131,15 +131,21 @@ inline std::vector<uint8_t> build_keepalive_frame(BufferPool& pool)
 }
 
 template <typename StartWriteFn>
-void enqueue_frame(
+bool enqueue_frame(
     std::queue<std::vector<uint8_t>>& write_queue,
     bool& writing,
-    std::vector<uint8_t> frame,
-    StartWriteFn&& start_write)
+    std::vector<uint8_t>&& frame,
+    StartWriteFn&& start_write,
+    std::size_t max_pending_frames = 0)
 {
+    if (max_pending_frames != 0 && write_queue.size() >= max_pending_frames)
+        return false;
+
     write_queue.push(std::move(frame));
     if (!writing)
         start_write();
+
+    return true;
 }
 
 } // namespace NightNetwork::Detail

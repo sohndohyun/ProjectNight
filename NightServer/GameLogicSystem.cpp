@@ -1,10 +1,9 @@
 #include "GameLogicSystem.h"
 
-#include <NightProtocol/messages_generated.h>
-
-#include <flatbuffers/flatbuffers.h>
+#include <NightProtocol/ProtocolUtil.h>
 
 #include <chrono>
+#include <cstddef>
 #include <print>
 #include <string>
 #include <utility>
@@ -25,9 +24,14 @@ Overloaded(T...) -> Overloaded<T...>;
 
 uint64_t CurrentTimestampMs()
 {
-    using namespace std::chrono;
-    return static_cast<uint64_t>(duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count());
+    return static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count());
 }
+
+constexpr std::size_t max_display_name_bytes = 32;
+constexpr std::size_t max_chat_message_bytes = 512;
+constexpr std::size_t max_protocol_payload_bytes = 2048;
 
 } // namespace
 
@@ -98,7 +102,7 @@ std::vector<uint32_t> GameLogicSystem::TakePendingDisconnects()
 void GameLogicSystem::HandleSessionConnected(const SessionConnectedEvent& event)
 {
     room_system_.AddSession(event.session_id);
-    std::println("[¡¢º”] ≈¨∂Û¿Ãæ∆Æ #{}", event.session_id);
+    std::println("[Ï†ëÏÜç] ÌÅ¥ÎùºÏù¥Ïñ∏Ìä∏ #{}", event.session_id);
 }
 
 void GameLogicSystem::HandleSessionDisconnected(const SessionDisconnectedEvent& event)
@@ -108,13 +112,13 @@ void GameLogicSystem::HandleSessionDisconnected(const SessionDisconnectedEvent& 
         NotifyRoomLeave(*session);
 
     room_system_.RemoveSession(event.session_id);
-    std::println("[¡æ∑·] ≈¨∂Û¿Ãæ∆Æ #{}", event.session_id);
+    std::println("[Ï¢ÖÎ£å] ÌÅ¥ÎùºÏù¥Ïñ∏Ìä∏ #{}", event.session_id);
 }
 
 void GameLogicSystem::HandleInvalidPacket(const InvalidPacketEvent& event)
 {
     QueueSystemMessage(event.session_id, 0, event.message);
-    std::println("[«¡∑Œ≈‰ƒ› ø¿∑˘] ≈¨∂Û¿Ãæ∆Æ #{}: {}", event.session_id, event.message);
+    std::println("[ÌîÑÎ°úÌÜ†ÏΩú Ïò§Î•ò] ÌÅ¥ÎùºÏù¥Ïñ∏Ìä∏ #{}: {}", event.session_id, event.message);
 }
 
 void GameLogicSystem::HandleLoginRequest(const LoginRequestEvent& request)
@@ -124,6 +128,12 @@ void GameLogicSystem::HandleLoginRequest(const LoginRequestEvent& request)
         return;
 
     if (request.display_name.empty())
+    {
+        QueueLoginResponse(request.session_id, request.request_id, false, NightProtocol::ErrorCode::INVALID_NAME, nullptr);
+        return;
+    }
+
+    if (request.display_name.size() > max_display_name_bytes)
     {
         QueueLoginResponse(request.session_id, request.request_id, false, NightProtocol::ErrorCode::INVALID_NAME, nullptr);
         return;
@@ -139,7 +149,7 @@ void GameLogicSystem::HandleLoginRequest(const LoginRequestEvent& request)
     session = room_system_.FindSession(request.session_id);
     QueueLoginResponse(request.session_id, request.request_id, true, NightProtocol::ErrorCode::NONE, session);
 
-    std::println("[∑Œ±◊¿Œ] ≈¨∂Û¿Ãæ∆Æ #{} -> {}", request.session_id, session->display_name);
+    std::println("[Î°úÍ∑∏Ïù∏] ÌÅ¥ÎùºÏù¥Ïñ∏Ìä∏ #{} -> {}", request.session_id, session->display_name);
 }
 
 void GameLogicSystem::HandleRoomListRequest(const RoomListRequestEvent& request)
@@ -186,7 +196,7 @@ void GameLogicSystem::HandleJoinRoomRequest(const JoinRoomRequestEvent& request)
     room = room_system_.FindRoom(request.room_id);
 
     QueueJoinRoomResponse(request.session_id, request.request_id, true, NightProtocol::ErrorCode::NONE, room);
-    QueueSystemMessage(request.session_id, room->room_id, room->room_name + " πÊø° ¿‘¿Â«ﬂΩ¿¥œ¥Ÿ.");
+    QueueSystemMessage(request.session_id, room->room_id, room->room_name + " Î∞©Ïóê ÏûÖÏû•ÌñàÏäµÎãàÎã§.");
 
     for (const auto& other_session : existing_members)
     {
@@ -197,7 +207,7 @@ void GameLogicSystem::HandleJoinRoomRequest(const JoinRoomRequestEvent& request)
         QueueUserJoinedEvent(request.session_id, room->room_id, other_session);
     }
 
-    std::println("[¿‘¿Â] ≈¨∂Û¿Ãæ∆Æ #{} -> πÊ #{} ({})", request.session_id, room->room_id, room->room_name);
+    std::println("[ÏûÖÏû•] ÌÅ¥ÎùºÏù¥Ïñ∏Ìä∏ #{} -> Î∞© #{} ({})", request.session_id, room->room_id, room->room_name);
 }
 
 void GameLogicSystem::HandleChatSendRequest(const ChatSendRequestEvent& request)
@@ -208,13 +218,19 @@ void GameLogicSystem::HandleChatSendRequest(const ChatSendRequestEvent& request)
 
     if (session->room_id == no_room_id)
     {
-        QueueSystemMessage(request.session_id, 0, "√§∆√¿ª ∫∏≥ª±‚ ¿¸ø° ∏’¿˙ πÊø° ¿‘¿Â«ÿæﬂ «’¥œ¥Ÿ.");
+        QueueSystemMessage(request.session_id, 0, "Ï±ÑÌåÖÏùÑ Î≥¥ÎÇ¥Í∏∞ Ï†ÑÏóê Î®ºÏ†Ä Î∞©Ïóê ÏûÖÏû•Ìï¥Ïïº Ìï©ÎãàÎã§.");
         return;
     }
 
     if (request.content.empty())
     {
-        QueueSystemMessage(request.session_id, session->room_id, "∫Û ∏ﬁΩ√¡ˆ¥¬ ¿¸º€«“ ºˆ æ¯Ω¿¥œ¥Ÿ.");
+        QueueSystemMessage(request.session_id, session->room_id, "Îπà Î©îÏãúÏßÄÎäî Ï†ÑÏÜ°Ìï† Ïàò ÏóÜÏäµÎãàÎã§.");
+        return;
+    }
+
+    if (request.content.size() > max_chat_message_bytes)
+    {
+        QueueSystemMessage(request.session_id, session->room_id, "Î©îÏãúÏßÄÍ∞Ä ÎÑàÎ¨¥ ÍπÅÎãàÎã§.");
         return;
     }
 
@@ -222,7 +238,7 @@ void GameLogicSystem::HandleChatSendRequest(const ChatSendRequestEvent& request)
     for (const auto& member : members)
         QueueChatBroadcast(member.session_id, session->room_id, *session, request.content);
 
-    std::println("[√§∆√] πÊ #{} | {}: {}", session->room_id, session->display_name, request.content);
+    std::println("[Ï±ÑÌåÖ] Î∞© #{} | {}: {}", session->room_id, session->display_name, request.content);
 }
 
 void GameLogicSystem::HandleLeaveRoomRequest(const LeaveRoomRequestEvent& request)
@@ -242,7 +258,7 @@ void GameLogicSystem::HandleLeaveRoomRequest(const LeaveRoomRequestEvent& reques
     room_system_.RemoveSessionFromCurrentRoom(request.session_id);
 
     QueueLeaveRoomResponse(request.session_id, request.request_id, true, NightProtocol::ErrorCode::NONE);
-    QueueSystemMessage(request.session_id, room_id, "πÊø°º≠ ≈¿Â«ﬂΩ¿¥œ¥Ÿ.");
+    QueueSystemMessage(request.session_id, room_id, "Î∞©ÏóêÏÑú Ìá¥Ïû•ÌñàÏäµÎãàÎã§.");
 }
 
 void GameLogicSystem::HandleDisconnectRequest(const DisconnectRequestEvent& request)
@@ -267,21 +283,6 @@ void GameLogicSystem::NotifyRoomLeave(const SessionState& session)
         QueueUserLeftEvent(member.session_id, session.room_id, session);
 }
 
-template <typename BuildPayload>
-static std::vector<uint8_t> BuildMessage(
-    uint32_t request_id,
-    NightProtocol::MessagePayload payload_type,
-    BuildPayload&& build_payload)
-{
-    flatbuffers::FlatBufferBuilder builder;
-    auto payload = build_payload(builder);
-    auto message = NightProtocol::CreateMessage(builder, request_id, payload_type, payload.Union());
-    NightProtocol::FinishMessageBuffer(builder, message);
-
-    const auto* begin = builder.GetBufferPointer();
-    return std::vector<uint8_t>(begin, begin + builder.GetSize());
-}
-
 static flatbuffers::Offset<NightProtocol::UserInfo> BuildUserInfo(flatbuffers::FlatBufferBuilder& builder, const SessionState& session)
 {
     return NightProtocol::CreateUserInfoDirect(builder, session.user_id, session.display_name.c_str());
@@ -298,6 +299,9 @@ static flatbuffers::Offset<NightProtocol::RoomInfo> BuildRoomInfo(flatbuffers::F
 
 void GameLogicSystem::QueueMessage(uint32_t session_id, std::vector<uint8_t> payload)
 {
+    if (payload.empty() || payload.size() > max_protocol_payload_bytes)
+        return;
+
     outgoing_messages_.push_back(OutgoingMessage {
         .session_id = session_id,
         .payload = std::move(payload),
@@ -312,7 +316,7 @@ void GameLogicSystem::QueueLoginResponse(
     const SessionState* session)
 {
     QueueMessage(session_id,
-                 BuildMessage(request_id, NightProtocol::MessagePayload::LoginResponse,
+                 NightProtocol::BuildMessage(request_id, NightProtocol::MessagePayload::LoginResponse,
                               [&](flatbuffers::FlatBufferBuilder& builder)
                               {
                                   flatbuffers::Offset<NightProtocol::UserInfo> user;
@@ -326,7 +330,7 @@ void GameLogicSystem::QueueLoginResponse(
 void GameLogicSystem::QueueRoomListResponse(uint32_t session_id, uint32_t request_id)
 {
     QueueMessage(session_id,
-                 BuildMessage(request_id, NightProtocol::MessagePayload::RoomListResponse,
+                 NightProtocol::BuildMessage(request_id, NightProtocol::MessagePayload::RoomListResponse,
                               [&](flatbuffers::FlatBufferBuilder& builder)
                               {
                                   std::vector<flatbuffers::Offset<NightProtocol::RoomInfo>> rooms;
@@ -346,7 +350,7 @@ void GameLogicSystem::QueueJoinRoomResponse(
     const RoomState* room)
 {
     QueueMessage(session_id,
-                 BuildMessage(request_id, NightProtocol::MessagePayload::JoinRoomResponse,
+                 NightProtocol::BuildMessage(request_id, NightProtocol::MessagePayload::JoinRoomResponse,
                               [&](flatbuffers::FlatBufferBuilder& builder)
                               {
                                   flatbuffers::Offset<NightProtocol::RoomInfo> room_info;
@@ -364,7 +368,7 @@ void GameLogicSystem::QueueLeaveRoomResponse(
     NightProtocol::ErrorCode error_code)
 {
     QueueMessage(session_id,
-                 BuildMessage(request_id, NightProtocol::MessagePayload::LeaveRoomResponse,
+                 NightProtocol::BuildMessage(request_id, NightProtocol::MessagePayload::LeaveRoomResponse,
                               [&](flatbuffers::FlatBufferBuilder& builder)
                               {
                                   return NightProtocol::CreateLeaveRoomResponse(builder, success, error_code);
@@ -378,7 +382,7 @@ void GameLogicSystem::QueueDisconnectResponse(
     NightProtocol::ErrorCode error_code)
 {
     QueueMessage(session_id,
-                 BuildMessage(request_id, NightProtocol::MessagePayload::DisconnectResponse,
+                 NightProtocol::BuildMessage(request_id, NightProtocol::MessagePayload::DisconnectResponse,
                               [&](flatbuffers::FlatBufferBuilder& builder)
                               {
                                   return NightProtocol::CreateDisconnectResponse(builder, success, error_code);
@@ -392,7 +396,7 @@ void GameLogicSystem::QueueChatBroadcast(
     const std::string& content)
 {
     QueueMessage(session_id,
-                 BuildMessage(0, NightProtocol::MessagePayload::ChatBroadcast,
+                 NightProtocol::BuildMessage(0, NightProtocol::MessagePayload::ChatBroadcast,
                               [&](flatbuffers::FlatBufferBuilder& builder)
                               {
                                   return NightProtocol::CreateChatBroadcastDirect(
@@ -408,7 +412,7 @@ void GameLogicSystem::QueueChatBroadcast(
 void GameLogicSystem::QueueUserJoinedEvent(uint32_t session_id, uint32_t room_id, const SessionState& joined_user)
 {
     QueueMessage(session_id,
-                 BuildMessage(0, NightProtocol::MessagePayload::UserJoinedEvent,
+                 NightProtocol::BuildMessage(0, NightProtocol::MessagePayload::UserJoinedEvent,
                               [&](flatbuffers::FlatBufferBuilder& builder)
                               {
                                   auto user = BuildUserInfo(builder, joined_user);
@@ -419,7 +423,7 @@ void GameLogicSystem::QueueUserJoinedEvent(uint32_t session_id, uint32_t room_id
 void GameLogicSystem::QueueUserLeftEvent(uint32_t session_id, uint32_t room_id, const SessionState& left_user)
 {
     QueueMessage(session_id,
-                 BuildMessage(0, NightProtocol::MessagePayload::UserLeftEvent,
+                 NightProtocol::BuildMessage(0, NightProtocol::MessagePayload::UserLeftEvent,
                               [&](flatbuffers::FlatBufferBuilder& builder)
                               {
                                   auto user = BuildUserInfo(builder, left_user);
@@ -430,7 +434,7 @@ void GameLogicSystem::QueueUserLeftEvent(uint32_t session_id, uint32_t room_id, 
 void GameLogicSystem::QueueSystemMessage(uint32_t session_id, uint32_t room_id, const std::string& content)
 {
     QueueMessage(session_id,
-                 BuildMessage(0, NightProtocol::MessagePayload::SystemMessageEvent,
+                 NightProtocol::BuildMessage(0, NightProtocol::MessagePayload::SystemMessageEvent,
                               [&](flatbuffers::FlatBufferBuilder& builder)
                               {
                                   return NightProtocol::CreateSystemMessageEventDirect(builder, room_id, content.c_str());

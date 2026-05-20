@@ -5,3 +5,4 @@ add_executable(NightServer
     "GameLogicSystem.cpp")
 
 target_link_libraries(NightServer PRIVATE NightNetwork NightCommon)
+add_dependencies(NightServer NightProtocolGenerated)

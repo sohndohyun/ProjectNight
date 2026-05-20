@@ -8,7 +8,7 @@ for %%I in ("%SCRIPT_DIR%..") do set "ROOT_DIR=%%~fI"
 set "CMAKE_CMD=cmake"
 set "VS_PATH="
 
-echo [ProjectNight] NightServer ºôµå ¹× ½ÇÇà
+echo [ProjectNight] NightServer ë¹Œë“œ ë° ì‹¤í–‰
 echo.
 
 where cl.exe >nul 2>&1
@@ -16,21 +16,21 @@ if errorlevel 1 goto :setup_env
 where cmake.exe >nul 2>&1
 if errorlevel 1 goto :setup_env
 
-echo [È¯°æ] ÀÌ¹Ì ¼³Á¤µÊ - °Ç³Ê¶Ü
+echo [í™˜ê²½] ì´ë¯¸ ì„¤ì •ë¨ - ê±´ë„ˆëœ€
 goto :build
 
 :setup_env
-echo [È¯°æ] Visual Studio È¯°æ ¼³Á¤ Áß...
+echo [í™˜ê²½] Visual Studio í™˜ê²½ ì„¤ì • ì¤‘...
 for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set "VS_PATH=%%i"
 if not defined VS_PATH (
-    echo [¿¡·¯] Visual Studio¸¦ Ã£À» ¼ö ¾ø½À´Ï´Ù.
+    echo [ì—ëŸ¬] Visual Studioë¥¼ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤.
     pause
     exit /b 1
 )
 
 call "%VS_PATH%\VC\Auxiliary\Build\vcvarsall.bat" x64 >nul 2>&1
 if errorlevel 1 (
-    echo [¿¡·¯] Visual Studio È¯°æ ¼³Á¤¿¡ ½ÇÆĞÇß½À´Ï´Ù.
+    echo [ì—ëŸ¬] Visual Studio í™˜ê²½ ì„¤ì •ì— ì‹¤íŒ¨í–ˆìŠµë‹ˆë‹¤.
     pause
     exit /b 1
 )
@@ -41,15 +41,15 @@ if exist "%VS_PATH%\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake
 
 where cl.exe >nul 2>&1
 if errorlevel 1 (
-    echo [¿¡·¯] cl.exe¸¦ Ã£À» ¼ö ¾ø½À´Ï´Ù.
+    echo [ì—ëŸ¬] cl.exeë¥¼ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤.
     pause
     exit /b 1
 )
 
 "%CMAKE_CMD%" --version >nul 2>&1
 if errorlevel 1 (
-    echo [¿¡·¯] cmake¸¦ Ã£À» ¼ö ¾ø½À´Ï´Ù.
-    echo        Visual Studio CMake ±¸¼º¿ä¼Ò ¶Ç´Â º°µµ CMake ¼³Ä¡°¡ ÇÊ¿äÇÕ´Ï´Ù.
+    echo [ì—ëŸ¬] cmakeë¥¼ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤.
+    echo        Visual Studio CMake êµ¬ì„±ìš”ì†Œ ë˜ëŠ” ë³„ë„ CMake ì„¤ì¹˜ê°€ í•„ìš”í•©ë‹ˆë‹¤.
     pause
     exit /b 1
 )
@@ -58,22 +58,22 @@ if errorlevel 1 (
 pushd "%ROOT_DIR%"
 
 if not exist "out\build\x64-debug\build.ninja" (
-    echo [ºôµå] CMake Configure...
+    echo [ë¹Œë“œ] CMake Configure...
     "%CMAKE_CMD%" --preset x64-debug
     if errorlevel 1 (
-        echo [¿¡·¯] Configure ½ÇÆĞ
+        echo [ì—ëŸ¬] Configure ì‹¤íŒ¨
         popd
         pause
         exit /b 1
     )
 ) else (
-    echo [ºôµå] Configure ½ºÅµ ^(ÀÌ¹Ì ±¸¼ºµÊ^)
+    echo [ë¹Œë“œ] Configure ìŠ¤í‚µ ^(ì´ë¯¸ êµ¬ì„±ë¨^)
 )
 
-echo [ºôµå] CMake Build ^(NightServer^)...
+echo [ë¹Œë“œ] CMake Build ^(NightServer^)...
 "%CMAKE_CMD%" --build out/build/x64-debug --target NightServer
 if errorlevel 1 (
-    echo [¿¡·¯] Build ½ÇÆĞ
+    echo [ì—ëŸ¬] Build ì‹¤íŒ¨
     popd
     pause
     exit /b 1

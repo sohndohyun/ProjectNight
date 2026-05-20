@@ -20,3 +20,4 @@ target_link_libraries(NightClient
         NightCommon
         wxWidgets::wxWidgets
 )
+add_dependencies(NightClient NightProtocolGenerated)

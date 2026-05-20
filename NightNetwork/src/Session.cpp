@@ -5,6 +5,11 @@
 namespace NightNetwork
 {
 
+namespace
+{
+constexpr std::size_t MAX_PENDING_WRITE_FRAMES = 1024;
+}
+
 Session::Session(uint32_t id, tcp::socket socket, BufferPool& pool,
                  ReceiveCallback on_receive, CloseCallback on_close)
     : id_(id)
@@ -67,11 +72,16 @@ void Session::enqueue_write(std::vector<uint8_t> frame)
         return;
     }
 
-    Detail::enqueue_frame(write_queue_, writing_, std::move(frame),
+    if (!Detail::enqueue_frame(write_queue_, writing_, std::move(frame),
         [this]()
         {
             do_write();
-        });
+        },
+        MAX_PENDING_WRITE_FRAMES))
+    {
+        pool_.release(std::move(frame));
+        handle_close();
+    }
 }
 
 void Session::do_read_header()

@@ -47,6 +47,11 @@ public:
     std::optional<std::vector<uint8_t>> poll_packet();
 
     /// <summary>
+    /// 내부 수신 큐가 가득 차서 상위 계층에 전달하지 못한 패킷 수를 반환한다.
+    /// </summary>
+    uint64_t dropped_packet_count() const;
+
+    /// <summary>
     /// 서버에 페이로드를 전송한다. I/O 스레드로 post 되므로 게임 스레드에서 안전하다.
     /// Protocol::MAX_PAYLOAD_SIZE(2048)를 초과하면 무시된다.
     /// </summary>

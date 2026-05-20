@@ -1,12 +1,13 @@
 # ProjectNight
 
-Boost.Asio 기반 비동기 TCP 채팅 서버/클라이언트 프로젝트.
+Asio 기반 비동기 TCP 채팅 서버/클라이언트 프로젝트.
 
 ## 프로젝트 구조
 
 | 디렉터리 | 설명 |
 |----------|------|
 | [**NightNetwork**](NightNetwork/README.md) | TCP 네트워크 정적 라이브러리 (구조, API, 사용 예시는 링크 참조) |
+| **NightCommon** | FlatBuffers 생성 헤더와 공통 프로토콜 유틸리티를 제공하는 공유 모듈 |
 | [**schema**](schema/README.md) | FlatBuffers 기반 채팅 프로토콜 스키마 및 메시지 설명 |
 | **NightServer** | NightNetwork를 사용하는 채팅 서버 애플리케이션 |
 | **NightClient** | NightNetwork를 사용하는 채팅 클라이언트 애플리케이션 |
@@ -64,7 +65,7 @@ vcpkg\bootstrap-vcpkg.bat
 | 포맷팅 | 4칸 스페이스, Allman 중괄호 |
 | 헤더 가드 | `#pragma once` |
 | 네임스페이스 | `using namespace std;` 금지, 항상 `std::` 명시 |
-| 에러 처리 | `try/catch` 금지, `std::expected` + `boost::system::error_code` 사용 |
+| 에러 처리 | `try/catch` 금지, `std::expected` + `std::error_code` 사용 |
 | 클래스 순서 | public -> protected -> private |
 
 ## 빌드 및 실행
@@ -91,10 +92,12 @@ scripts\run_client.bat 3
 ```
 
 클라이언트 수를 인자로 넘기면 해당 수만큼 별도 창에서 동시에 실행됩니다.
+`scripts\run_client_X3.bat`는 `scripts\run_client.bat 3`을 호출하는 편의 래퍼입니다.
 
 ## 프로토콜 문서
 
 채팅 프로토콜 구조와 메시지 타입 설명은 [`schema/README.md`](schema/README.md) 문서를 참조합니다.
+`schema/messages.fbs`가 변경되면 CMake 빌드 중 `NightProtocolGenerated` 타겟이 `NightCommon/NightProtocol/messages_generated.h`를 자동으로 갱신합니다.
 
 ## 테스트 방법
 
@@ -108,6 +111,7 @@ scripts\run_client.bat 3
 ## 수동 빌드
 
 bat 파일 없이 직접 빌드할 수도 있습니다.
+아래 명령은 `cmake`가 PATH에 잡혀 있는 셸에서 실행해야 합니다. PATH에 없다면 `scripts\run_server.bat` 또는 `scripts\run_client.bat`가 Visual Studio에 포함된 CMake를 자동으로 찾아 사용합니다.
 
 ```bat
 cmake --preset x64-debug
@@ -120,6 +124,22 @@ cmake --build out/build/x64-debug
 cmake --build out/build/x64-debug --target NightServer
 cmake --build out/build/x64-debug --target NightClient
 ```
+
+스키마 생성만 명시적으로 실행하려면 다음 타겟을 빌드합니다.
+
+```bat
+cmake --build out/build/x64-debug --target NightProtocolGenerated
+```
+
+## Linux Docker Release
+
+Docker Desktop의 Linux container 환경에서는 다음 스크립트로 Release 빌드 산출물을 만들 수 있습니다.
+
+```bat
+scripts\publish_linux_docker.bat
+```
+
+산출물은 `publish/linux-release/` 아래에 복사됩니다.
 
 ## 빌드 산출물 경로
 

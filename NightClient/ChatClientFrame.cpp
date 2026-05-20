@@ -360,8 +360,6 @@ void ChatClientFrame::OnJoinRoomClicked(wxCommandEvent&)
         return;
     }
 
-    current_room_id_ = room->room_id;
-    current_room_label_->SetLabel(wxString::Format("Current Room: #%u %s", room->room_id, room->room_name.c_str()));
     AppendSystemMessage(wxString::Format("Sent join request for room #%u.", room->room_id));
     protocol_client_.SendJoinRoomRequest(room->room_id);
 }

@@ -1,21 +1,9 @@
 #include "NetworkSystem.h"
 
-#include <NightProtocol/messages_generated.h>
-
-#include <flatbuffers/flatbuffers.h>
+#include <NightProtocol/ProtocolUtil.h>
 
 namespace NightServer
 {
-namespace
-{
-
-std::string ToUtf8(const flatbuffers::String* value)
-{
-    return value ? std::string(value->c_str()) : std::string {};
-}
-
-} // namespace
-
 NetworkSystem::NetworkSystem(NightNetwork::Server server)
     : server_(std::move(server))
 {
@@ -64,7 +52,7 @@ void NetworkSystem::DecodeProtocolPacket(uint32_t session_id, const std::vector<
     {
         events.push_back(InvalidPacketEvent {
             .session_id = session_id,
-            .message = "¼ö½Å µ¥ÀÌÅÍ°¡ Message ½ºÅ°¸¶¿Í ÀÏÄ¡ÇÏÁö ¾Ê½À´Ï´Ù.",
+            .message = "ìˆ˜ì‹  ë°ì´í„°ê°€ Message ìŠ¤í‚¤ë§ˆì™€ ì¼ì¹˜í•˜ì§€ ì•ŠìŠµë‹ˆë‹¤.",
         });
         return;
     }
@@ -74,7 +62,7 @@ void NetworkSystem::DecodeProtocolPacket(uint32_t session_id, const std::vector<
     {
         events.push_back(InvalidPacketEvent {
             .session_id = session_id,
-            .message = "ÇÁ·ÎÅäÄÝ ¸Þ½ÃÁö¸¦ ¿ªÁ÷·ÄÈ­ÇÏÁö ¸øÇß½À´Ï´Ù.",
+            .message = "í”„ë¡œí† ì½œ ë©”ì‹œì§€ë¥¼ ì—­ì§ë ¬í™”í•˜ì§€ ëª»í–ˆìŠµë‹ˆë‹¤.",
         });
         return;
     }
@@ -90,7 +78,7 @@ void NetworkSystem::DecodeProtocolPacket(uint32_t session_id, const std::vector<
         events.push_back(LoginRequestEvent {
             .session_id = session_id,
             .request_id = message->request_id(),
-            .display_name = ToUtf8(request->display_name()),
+            .display_name = NightProtocol::ToUtf8(request->display_name()),
         });
         break;
     }
@@ -125,7 +113,7 @@ void NetworkSystem::DecodeProtocolPacket(uint32_t session_id, const std::vector<
         events.push_back(ChatSendRequestEvent {
             .session_id = session_id,
             .request_id = message->request_id(),
-            .content = ToUtf8(request->content()),
+            .content = NightProtocol::ToUtf8(request->content()),
         });
         break;
     }
@@ -147,7 +135,7 @@ void NetworkSystem::DecodeProtocolPacket(uint32_t session_id, const std::vector<
     default:
         events.push_back(InvalidPacketEvent {
             .session_id = session_id,
-            .message = "¼­¹ö°¡ Ã³¸®ÇÏÁö ¾Ê´Â payload Å¸ÀÔÀÔ´Ï´Ù.",
+            .message = "ì„œë²„ê°€ ì²˜ë¦¬í•˜ì§€ ì•ŠëŠ” payload íƒ€ìž…ìž…ë‹ˆë‹¤.",
         });
         break;
     }
